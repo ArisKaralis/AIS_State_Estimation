@@ -1,0 +1,133 @@
+function [estimates, stats] = runExtendedKalmanFilterCV(data, q)
+% RUNEXTENDEDKALMANFILTER - Apply EKF to AIS data
+% Uses extendedKalmanFilter from Sensor Fusion and Tracking Toolbox
+
+% Extract measurements
+n = height(data);
+dt = zeros(n, 1);
+for i = 2:n
+    dt(i) = seconds(data.timestamp(i) - data.timestamp(i-1));
+end
+
+% Initialize state and covariance arrays
+x_est = zeros(4, n);
+P_est = zeros(4, 4, n);
+
+% Process noise parameter (lower for better filtering)
+q = 0.05;  % Reduced further for more smoothing
+
+% Use the measured position standard deviation from your simulation
+pos_std = 15;  % Approx 21m RMSE / sqrt(2)
+vel_std = 1;   % From SOG RMSE of ~1 m/s
+
+% Get initial velocity from SOG and COG of first measurement
+initial_vx = 0;
+initial_vy = 0;
+if ~isnan(data.SOG(1)) && ~isnan(data.COG(1))
+    initial_vx = data.SOG(1) * cosd(data.COG(1));
+    initial_vy = data.SOG(1) * sind(data.COG(1));
+else
+    % Fall back to calculating from positions if available
+    if n > 1 && dt(2) > 0
+        initial_vx = (data.x(2) - data.x(1)) / dt(2);
+        initial_vy = (data.y(2) - data.y(1)) / dt(2);
+    end
+end
+
+% Create EKF using CV model with nonlinear measurement model
+% State: [x; vx; y; vy]
+% Measurement: [x; y; SOG; COG]
+ekf = extendedKalmanFilter(@cvStateTransitionFcn, @measurementFcn);
+
+% Initialize filter state and covariance with better estimates
+ekf.State = [data.x(1); initial_vx; data.y(1); initial_vy];
+
+% More confident initial state - smaller initial covariance
+ekf.StateCovariance = diag([pos_std^2/2, vel_std^2/2, pos_std^2/2, vel_std^2/2]);
+
+% Measurement noise - slightly increase position uncertainty but decrease velocity uncertainty
+R = diag([pos_std^2*1.5, pos_std^2*1.5, vel_std^2*0.5, deg2rad(4)^2]);
+
+% Store initial state and covariance
+x_est(:,1) = ekf.State;
+P_est(:,:,1) = ekf.StateCovariance;
+
+% First few measurements - more aggressive correction to help convergence
+burn_in_period = 10;
+burn_in_R = R * 0.25;  % Lower measurement noise during burn-in = trust measurements more
+
+% Main filtering loop
+for k = 2:n
+    % Create process noise based on time difference
+    Q = [q*dt(k)^3/3, q*dt(k)^2/2, 0, 0;
+         q*dt(k)^2/2, q*dt(k),    0, 0;
+         0, 0, q*dt(k)^3/3, q*dt(k)^2/2;
+         0, 0, q*dt(k)^2/2, q*dt(k)];
+    
+    % Set process noise before predicting
+    ekf.ProcessNoise = Q;
+    
+    % Predict - passing only dt(k) as the additional argument
+    predict(ekf, dt(k));
+    
+    % Create measurement vector: [x; y; SOG; COG]
+    z = [data.x(k); data.y(k); data.SOG(k); deg2rad(data.COG(k))];
+    
+    % Use more aggressive measurement updates during burn-in period
+    if k <= burn_in_period
+        ekf.MeasurementNoise = burn_in_R;
+    else
+        ekf.MeasurementNoise = R;
+    end
+    
+    % Correct with the measurement
+    correct(ekf, z);
+    
+    % Store estimates
+    x_est(:,k) = ekf.State;
+    P_est(:,:,k) = ekf.StateCovariance;
+end
+
+% Create output table
+estimates = table();
+estimates.timestamp = data.timestamp;
+estimates.x_est = x_est(1,:)';
+estimates.y_est = x_est(3,:)';
+estimates.vx_est = x_est(2,:)';
+estimates.vy_est = x_est(4,:)';
+estimates.sog_est = sqrt(x_est(2,:).^2 + x_est(4,:).^2)';
+estimates.cog_est = mod(atan2(x_est(4,:), x_est(2,:)) * 180/pi, 360)';
+
+% Calculate error statistics if ground truth is available
+stats = calculateErrorStatistics(data, estimates, 'EKF-CV');
+
+% Plot results
+plotFilterResults(data, estimates, 'Extended Kalman Filter (CV Model)');
+
+end
+
+% State transition function for CV model that takes dt as parameter
+function x = cvStateTransitionFcn(x, dt)
+    % State transition function for constant velocity model
+    F = [1 dt 0 0;
+         0 1  0 0;
+         0 0  1 dt;
+         0 0  0 1];
+    x = F * x;
+end
+
+function z = measurementFcn(x)
+    % Nonlinear measurement function: [x; y; SOG; COG]
+    vx = x(2);
+    vy = x(4);
+    
+    % Calculate SOG and COG
+    sog = sqrt(vx^2 + vy^2);
+    if sog > 0.01
+        cog = atan2(vy, vx);
+    else
+        cog = 0;  % Avoid division by zero
+    end
+    
+    z = [x(1); x(3); sog; cog];
+end
