@@ -48,7 +48,7 @@ plot(t, estimates.cog_est, 'r-', 'LineWidth', 1.5, 'DisplayName', 'Filter');
 
 % Add segment boundaries
 for i = 1:length(segmentChanges)
-    xline(segmentChanges(i)+1, 'k--');
+    xline(segmentChanges(i)+1, 'k--', 'HandleVisibility', 'off');
 end
 
 xlabel('Sample number');
@@ -64,19 +64,9 @@ plot(t, posError, 'b-', 'LineWidth', 1.5);
 
 % Add segment boundaries
 for i = 1:length(segmentChanges)
-    xline(segmentChanges(i)+1, 'k--');
+    xline(segmentChanges(i)+1, 'k--', 'HandleVisibility', 'off');
 end
 
-% % Add segment labels
-% uniqueSegments = unique(data.segment);
-% for s = 1:length(uniqueSegments)
-%     segIdx = find(data.segment == s);
-%     if ~isempty(segIdx)
-%         midIdx = segIdx(ceil(length(segIdx)/2));
-%         text(t(midIdx), max(posError)/2, char(data.segment_name(midIdx)), ...
-%             'FontWeight', 'bold', 'FontSize', 8, 'HorizontalAlignment', 'center');
-%     end
-% end
 
 xlabel('Sample number');
 ylabel('Error (m)');

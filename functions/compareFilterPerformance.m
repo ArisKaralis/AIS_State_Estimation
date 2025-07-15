@@ -43,19 +43,7 @@ plot(t, pos_err_imm, 'm-', 'LineWidth', 1.5, 'DisplayName', 'IMM');
 % Add segment boundaries
 segmentChanges = find(diff(data.segment) ~= 0);
 for i = 1:length(segmentChanges)
-    xline(t(segmentChanges(i)+1), 'k--');
-end
-
-% Add segment labels
-uniqueSegments = unique(data.segment);
-for s = 1:length(uniqueSegments)
-    segIdx = find(data.segment == s);
-    if ~isempty(segIdx)
-        midIdx = segIdx(ceil(length(segIdx)/2));
-        text(t(midIdx), max([pos_err_kf; pos_err_ekf_cv; pos_err_ekf_cv; pos_err_ukf])/2, ...
-            char(data.segment_name(midIdx)), ...
-            'FontWeight', 'bold', 'FontSize', 8, 'HorizontalAlignment', 'center');
-    end
+    xline(t(segmentChanges(i)+1), 'k--', 'HandleVisibility', 'off');
 end
 
 xlabel('Samples');
@@ -77,7 +65,7 @@ plot(t, imm_est.sog_est, 'm-', 'LineWidth', 1.5, 'DisplayName', 'IMM');
 
 % Add segment boundaries
 for i = 1:length(segmentChanges)
-    xline(t(segmentChanges(i)+1), 'k--');
+    xline(t(segmentChanges(i)+1), 'k--', 'HandleVisibility', 'off');
 end
 
 xlabel('Samples');
@@ -99,7 +87,7 @@ plot(t, imm_est.cog_est, 'm-', 'LineWidth', 1.5, 'DisplayName', 'IMM');
 
 % Add segment boundaries
 for i = 1:length(segmentChanges)
-    xline(t(segmentChanges(i)+1), 'k--');
+    xline(t(segmentChanges(i)+1), 'k--', 'HandleVisibility', 'off');
 end
 
 xlabel('Samples');
