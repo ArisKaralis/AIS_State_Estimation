@@ -15,11 +15,6 @@ for i = 2:n
     dt(i) = seconds(data.timestamp(i) - data.timestamp(i-1));
 end
 
-% Initialize state and covariance arrays
-x_est = zeros(5, n);  % Store full 5-state (CTRV model dimensions)
-P_est = zeros(5, 5, n);
-model_probs = zeros(2, n);  % Store model probabilities [CV; CTRV]
-
 % Research paper noise specifications
 pos_noise_std = 5;      % Position measurement noise: σ = 5 meters
 vel_noise_std = 0.07;   % Velocity process noise: σ_v = 0.07 m/s
@@ -48,23 +43,13 @@ if ~isnan(data.SOG(1)) && ~isnan(data.COG(1))
     end
 end
 
-% Calculate average dt for filter initialization
-avg_dt = mean(dt(2:end));
-if isnan(avg_dt) || avg_dt <= 0
-    avg_dt = 1; % Default 1 second
-end
-
-% Create Filter 1: Linear Kalman Filter for CV model (4 states: x, vx, y, vy)
-F_cv = [1 avg_dt 0 0; 0 1 0 0; 0 0 1 avg_dt; 0 0 0 1];
-Q_cv = [vel_noise_std^2 * [avg_dt^4/4 avg_dt^3/2; avg_dt^3/2 avg_dt^2], zeros(2,2);
-        zeros(2,2), vel_noise_std^2 * [avg_dt^4/4 avg_dt^3/2; avg_dt^3/2 avg_dt^2]];
-
-cvFilter = trackingKF('MotionModel', 'Custom', ...
-                     'StateTransitionModel', F_cv, ...
-                     'State', [data.x(1); initial_vx; data.y(1); initial_vy], ...
-                     'StateCovariance', diag([pos_noise_std^2, vel_noise_std^2, pos_noise_std^2, vel_noise_std^2]), ...
-                     'ProcessNoise', Q_cv, ...
-                     'MeasurementModel', [1 0 0 0; 0 0 1 0], ...
+% Create Filter 1: Linear Kalman Filter for CV model using built-in motion model
+% This avoids the fixed transition matrix issue
+cvFilter = trackingKF('MotionModel', '2D Constant Velocity', ...
+                     'State', [data.x(1); data.y(1); initial_vx; initial_vy], ...
+                     'StateCovariance', diag([pos_noise_std^2, pos_noise_std^2, vel_noise_std^2, vel_noise_std^2]), ...
+                     'ProcessNoise', diag([vel_noise_std^2, vel_noise_std^2]), ... % 2x2 for velocity components
+                     'MeasurementModel', [1 0 0 0; 0 1 0 0], ...
                      'MeasurementNoise', diag([pos_noise_std^2, pos_noise_std^2]));
 
 % Create Filter 2: Unscented Kalman Filter for CTRV model (5 states: x, y, v, ψ, ψ̇)
@@ -89,9 +74,17 @@ imm = trackingIMM({cvFilter, ctrvFilter}, ...
                   'ModelConversionFcn', @CVCTRVModelConversionFcn, ...
                   'TransitionProbabilities', transitionMatrix);
 
-% Initialize IMM filter with equal probabilities
+% Initialize IMM filter with CTRV state format (5 states)
 initialize(imm, [data.x(1); data.y(1); initial_speed; initial_heading; initial_yaw_rate], ...
            diag([pos_noise_std^2, pos_noise_std^2, vel_noise_std^2, heading_noise_std^2, yaw_rate_noise_std^2]));
+
+% Get the actual state size from the initialized IMM filter
+state_size = length(imm.State);
+
+% Initialize state and covariance arrays with correct size
+x_est = zeros(state_size, n);
+P_est = zeros(state_size, state_size, n);
+model_probs = zeros(2, n);  % Store model probabilities [CV; CTRV]
 
 % Store initial estimates
 x_est(:,1) = imm.State;
@@ -100,13 +93,14 @@ model_probs(:,1) = imm.ModelProbabilities;
 
 fprintf('IMM: Initial model probabilities - CV: %.3f, CTRV: %.3f\n', ...
         model_probs(1,1), model_probs(2,1));
+fprintf('IMM: State size is %d\n', state_size);
 
 % Main filtering loop
 for k = 2:n
     % Get time step for this iteration
     current_dt = dt(k);
     if isnan(current_dt) || current_dt <= 0
-        current_dt = avg_dt;
+        current_dt = 1.0; % Default 1 second
     end
     
     % Predict with time step
@@ -130,18 +124,32 @@ for k = 2:n
     end
 end
 
-% Convert CTRV state to CV format for output
+% Create output estimates based on the actual state size
 estimates = table();
 estimates.timestamp = data.timestamp;
-estimates.x_est = x_est(1,:)';
-estimates.y_est = x_est(2,:)';
 
-% Convert CTRV velocity to Cartesian components
-estimates.vx_est = x_est(3,:)' .* cos(x_est(4,:)');
-estimates.vy_est = x_est(3,:)' .* sin(x_est(4,:)');
-estimates.sog_est = x_est(3,:)';
-estimates.cog_est = mod(x_est(4,:)' * 180/pi, 360);
-estimates.yaw_rate_est = x_est(5,:)';
+% Handle different state sizes
+if state_size == 5
+    % CTRV format: [x, y, v, ψ, ψ̇]
+    estimates.x_est = x_est(1,:)';
+    estimates.y_est = x_est(2,:)';
+    estimates.vx_est = x_est(3,:)' .* cos(x_est(4,:)');
+    estimates.vy_est = x_est(3,:)' .* sin(x_est(4,:)');
+    estimates.sog_est = x_est(3,:)';
+    estimates.cog_est = mod(x_est(4,:)' * 180/pi, 360);
+    estimates.yaw_rate_est = x_est(5,:)';
+elseif state_size == 4
+    % CV format: [x, y, vx, vy] - note the 2D Constant Velocity model uses this order
+    estimates.x_est = x_est(1,:)';
+    estimates.y_est = x_est(2,:)';
+    estimates.vx_est = x_est(3,:)';
+    estimates.vy_est = x_est(4,:)';
+    estimates.sog_est = sqrt(x_est(3,:)'.^2 + x_est(4,:)'.^2);
+    estimates.cog_est = mod(atan2(x_est(4,:)', x_est(3,:)') * 180/pi, 360);
+    estimates.yaw_rate_est = zeros(size(x_est(1,:)'));
+else
+    error('Unexpected state size: %d', state_size);
+end
 
 % Model probabilities
 estimates.cv_prob = model_probs(1,:)';
@@ -165,34 +173,36 @@ if strcmp(modelName1, modelName2)
 end
 
 if strcmp(modelName1, 'cv') && strcmp(modelName2, 'ctrv')
-    % CV to CTRV conversion: [x, vx, y, vy] -> [x, y, v, ψ, ψ̇]
-    if isvector(x2)
+    % CV to CTRV conversion: [x, y, vx, vy] -> [x, y, v, ψ, ψ̇]
+    if isvector(x1) && isvector(x2)
         x2(1) = x1(1);  % x
-        x2(2) = x1(3);  % y
-        x2(3) = sqrt(x1(2)^2 + x1(4)^2);  % v = sqrt(vx^2 + vy^2)
-        x2(4) = atan2(x1(4), x1(2));      % ψ = atan2(vy, vx)
+        x2(2) = x1(2);  % y
+        x2(3) = sqrt(x1(3)^2 + x1(4)^2);  % v = sqrt(vx^2 + vy^2)
+        x2(4) = atan2(x1(4), x1(3));      % ψ = atan2(vy, vx)
         x2(5) = 0;      % ψ̇ = 0 (assume no turn rate)
     else
         % Covariance conversion (approximate)
+        x2 = zeros(5, 5);
         x2(1,1) = x1(1,1);  % x variance
-        x2(2,2) = x1(3,3);  % y variance
-        x2(3,3) = x1(2,2) + x1(4,4);  % v variance (approximate)
+        x2(2,2) = x1(2,2);  % y variance
+        x2(3,3) = x1(3,3) + x1(4,4);  % v variance (approximate)
         x2(4,4) = deg2rad(5)^2;  % ψ variance (default)
         x2(5,5) = deg2rad(0.1)^2;  % ψ̇ variance (default)
     end
     
 elseif strcmp(modelName1, 'ctrv') && strcmp(modelName2, 'cv')
-    % CTRV to CV conversion: [x, y, v, ψ, ψ̇] -> [x, vx, y, vy]
-    if isvector(x2)
+    % CTRV to CV conversion: [x, y, v, ψ, ψ̇] -> [x, y, vx, vy]
+    if isvector(x1) && isvector(x2)
         x2(1) = x1(1);  % x
-        x2(2) = x1(3) * cos(x1(4));  % vx = v * cos(ψ)
-        x2(3) = x1(2);  % y
+        x2(2) = x1(2);  % y
+        x2(3) = x1(3) * cos(x1(4));  % vx = v * cos(ψ)
         x2(4) = x1(3) * sin(x1(4));  % vy = v * sin(ψ)
     else
         % Covariance conversion (approximate)
+        x2 = zeros(4, 4);
         x2(1,1) = x1(1,1);  % x variance
-        x2(2,2) = x1(3,3);  % vx variance (approximate)
-        x2(3,3) = x1(2,2);  % y variance
+        x2(2,2) = x1(2,2);  % y variance
+        x2(3,3) = x1(3,3);  % vx variance (approximate)
         x2(4,4) = x1(3,3);  % vy variance (approximate)
     end
 else
@@ -235,6 +245,7 @@ function z = ctrvMeasurementFcn(x)
 % CTRV measurement function: [x, y] position only
 z = [x(1); x(2)];
 end
+
 
 %% Enhanced Error Statistics Function
 function stats = calculateEnhancedErrorStatistics(data, estimates, filterName)
@@ -406,7 +417,7 @@ end
 
 %% Enhanced Model Probabilities Plotting
 function plotModelProbabilities(data, estimates)
-figure('Position', [100, 100, 1200, 800]);
+figure;
 
 % Main probability plot
 subplot(2,1,1);

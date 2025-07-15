@@ -1,4 +1,4 @@
-function compareFilterPerformance(data, kf_est, ekf_est_cv, ekf_ca, ukf_est, imm_est)
+function compareFilterPerformance(data, kf_est, ekf_est_cv, ekf_est_ca, ukf_est, imm_est)
 % COMPAREFILTERPERFORMANCE - Compare and visualize performance across filters
 
 % Create figure for comparison
@@ -13,7 +13,7 @@ plot(data.x, data.y, 'k.', 'MarkerSize', 4, 'DisplayName', 'Measurements');
 hold on;
 plot(data.x_true, data.y_true, 'k-', 'LineWidth', 2, 'DisplayName', 'Ground Truth');
 plot(kf_est.x_est, kf_est.y_est, 'b-', 'LineWidth', 1.5, 'DisplayName', 'KF');
-plot(ekf_est_cv.x_est, ekf_esv_cb.y_est, 'r-', 'LineWidth', 1.5, 'DisplayName', 'EKF-CV');
+plot(ekf_est_cv.x_est, ekf_est_cv.y_est, 'r-', 'LineWidth', 1.5, 'DisplayName', 'EKF-CV');
 plot(ekf_est_ca.x_est, ekf_est_ca.y_est, 'r-', 'LineWidth', 1.5, 'DisplayName', 'EKF-CA');
 plot(ukf_est.x_est, ukf_est.y_est, 'g-', 'LineWidth', 1.5, 'DisplayName', 'UKF');
 plot(imm_est.x_est, imm_est.y_est, 'm-', 'LineWidth', 1.5, 'DisplayName', 'IMM');
@@ -52,7 +52,7 @@ for s = 1:length(uniqueSegments)
     segIdx = find(data.segment == s);
     if ~isempty(segIdx)
         midIdx = segIdx(ceil(length(segIdx)/2));
-        text(t(midIdx), max([pos_err_kf; pos_err_ekf_cv; pos_err_ekf_cv; pos_err_ukf; pos_err_imm])/2, ...
+        text(t(midIdx), max([pos_err_kf; pos_err_ekf_cv; pos_err_ekf_cv; pos_err_ukf])/2, ...
             char(data.segment_name(midIdx)), ...
             'FontWeight', 'bold', 'FontSize', 8, 'HorizontalAlignment', 'center');
     end
@@ -92,8 +92,8 @@ plot(t, data.COG, 'k.', 'MarkerSize', 4, 'DisplayName', 'Measurements');
 hold on;
 plot(t, data.cog_true, 'k-', 'LineWidth', 2, 'DisplayName', 'Ground Truth');
 plot(t, kf_est.cog_est, 'b-', 'LineWidth', 1.5, 'DisplayName', 'KF');
-plot(t, ekf_est.cog_est_cv, 'r-', 'LineWidth', 1.5, 'DisplayName', 'EKF-CV');
-plot(t, ekf_est.cog_est_ca, 'r-', 'LineWidth', 1.5, 'DisplayName', 'EKF-CA');
+plot(t, ekf_est_cv.cog_est, 'r-', 'LineWidth', 1.5, 'DisplayName', 'EKF-CV');
+plot(t, ekf_est_ca.cog_est, 'r-', 'LineWidth', 1.5, 'DisplayName', 'EKF-CA');
 plot(t, ukf_est.cog_est, 'g-', 'LineWidth', 1.5, 'DisplayName', 'UKF');
 plot(t, imm_est.cog_est, 'm-', 'LineWidth', 1.5, 'DisplayName', 'IMM');
 
@@ -150,8 +150,8 @@ ukf_sog_rmse = sqrt(mean((ukf_est.sog_est - data.sog_true).^2));
 imm_sog_rmse = sqrt(mean((imm_est.sog_est - data.sog_true).^2));
 
 kf_cog_rmse = sqrt(mean((angdiff(deg2rad(kf_est.cog_est), deg2rad(data.cog_true)) * 180/pi).^2));
-ekf_cv_cog_rmse = sqrt(mean((angdiff(deg2rad(ekf_cv_est.cog_est), deg2rad(data.cog_true)) * 180/pi).^2));
-ekf_ca_cog_rmse = sqrt(mean((angdiff(deg2rad(ekf_ca_est.cog_est), deg2rad(data.cog_true)) * 180/pi).^2));
+ekf_cv_cog_rmse = sqrt(mean((angdiff(deg2rad(ekf_est_cv.cog_est), deg2rad(data.cog_true)) * 180/pi).^2));
+ekf_ca_cog_rmse = sqrt(mean((angdiff(deg2rad(ekf_est_ca.cog_est), deg2rad(data.cog_true)) * 180/pi).^2));
 ukf_cog_rmse = sqrt(mean((angdiff(deg2rad(ukf_est.cog_est), deg2rad(data.cog_true)) * 180/pi).^2));
 imm_cog_rmse = sqrt(mean((angdiff(deg2rad(imm_est.cog_est), deg2rad(data.cog_true)) * 180/pi).^2));
 

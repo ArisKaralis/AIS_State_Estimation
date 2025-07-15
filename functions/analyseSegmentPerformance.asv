@@ -55,13 +55,13 @@ for i = 1:numSegments
     % COG RMSE
     cog_rmse(1, i) = sqrt(mean((angdiff(deg2rad(kf_est.cog_est(segIdx)), ...
                                        deg2rad(data.cog_true(segIdx))) * 180/pi).^2));
-    cog_rmse(2, i) = sqrt(mean((angdiff(deg2rad(ekf_est_cv.cog_est(segIdx)), ...
+    cog_rmse(2, i) = sqrt(mean((angdiff(deg2rad(ekf_est.cog_est(segIdx)), ...
                                        deg2rad(data.cog_true(segIdx))) * 180/pi).^2));
-    cog_rmse(3, i) = sqrt(mean((angdiff(deg2rad(ekf_est_ca.cog_est(segIdx)), ...
+    cog_rmse(2, i) = sqrt(mean((angdiff(deg2rad(ekf_est.cog_est(segIdx)), ...
                                        deg2rad(data.cog_true(segIdx))) * 180/pi).^2));
-    cog_rmse(4, i) = sqrt(mean((angdiff(deg2rad(ukf_est.cog_est(segIdx)), ...
+    cog_rmse(3, i) = sqrt(mean((angdiff(deg2rad(ukf_est.cog_est(segIdx)), ...
                                        deg2rad(data.cog_true(segIdx))) * 180/pi).^2));
-    cog_rmse(5, i) = sqrt(mean((angdiff(deg2rad(imm_est.cog_est(segIdx)), ...
+    cog_rmse(4, i) = sqrt(mean((angdiff(deg2rad(imm_est.cog_est(segIdx)), ...
                                        deg2rad(data.cog_true(segIdx))) * 180/pi).^2));
 end
 
@@ -75,7 +75,7 @@ xlabel('Segment');
 ylabel('RMSE (m)');
 title('Position Error by Segment');
 set(gca, 'XTickLabel', segment_names);
-legend('KF', 'EKF-CV', 'EKF-CA', 'UKF', 'IMM', 'Location', 'best');
+legend('KF', 'EKF', 'UKF', 'EKF-CA', 'Location', 'best');
 grid on;
 
 % Velocity RMSE by segment
@@ -85,7 +85,7 @@ xlabel('Segment');
 ylabel('RMSE (m/s)');
 title('Velocity Error by Segment');
 set(gca, 'XTickLabel', segment_names);
-legend('KF', 'EKF-CV', 'EKF-CA', 'UKF', 'IMM', 'Location', 'best');
+legend('KF', 'EKF', 'UKF', 'EKF-CA', 'Location', 'best');
 grid on;
 
 % SOG RMSE by segment
@@ -95,7 +95,7 @@ xlabel('Segment');
 ylabel('RMSE (m/s)');
 title('Speed Over Ground Error by Segment');
 set(gca, 'XTickLabel', segment_names);
-legend('KF', 'EKF-CV', 'EKF-CA', 'UKF', 'IMM', 'Location', 'best');
+legend('KF', 'EKF', 'UKF', 'EKF-CA', 'Location', 'best');
 grid on;
 
 % COG RMSE by segment
@@ -105,7 +105,7 @@ xlabel('Segment');
 ylabel('RMSE (degrees)');
 title('Course Over Ground Error by Segment');
 set(gca, 'XTickLabel', segment_names);
-legend('KF', 'EKF-CV', 'EKF-CA', 'UKF', 'IMM', 'Location', 'best');
+legend('KF', 'EKF', 'UKF', 'EKF-CA', 'Location', 'best');
 grid on;
 
 sgtitle('Filter Performance by Motion Segment');
@@ -129,13 +129,11 @@ for i = 1:numSegments
     fprintf('%-10s | %-10.2f | %-10.2f | %-10.2f | %-10.2f\n', ...
             'KF', pos_rmse(1,i), vel_rmse(1,i), sog_rmse(1,i), cog_rmse(1,i));
     fprintf('%-10s | %-10.2f | %-10.2f | %-10.2f | %-10.2f\n', ...
-            'EKF-CV', pos_rmse(2,i), vel_rmse(2,i), sog_rmse(2,i), cog_rmse(2,i));
+            'EKF', pos_rmse(2,i), vel_rmse(2,i), sog_rmse(2,i), cog_rmse(2,i));
     fprintf('%-10s | %-10.2f | %-10.2f | %-10.2f | %-10.2f\n', ...
-            'EKF-CA', pos_rmse(3,i), vel_rmse(3,i), sog_rmse(3,i), cog_rmse(3,i));
+            'UKF', pos_rmse(3,i), vel_rmse(3,i), sog_rmse(3,i), cog_rmse(3,i));
     fprintf('%-10s | %-10.2f | %-10.2f | %-10.2f | %-10.2f\n', ...
-            'UKF', pos_rmse(4,i), vel_rmse(4,i), sog_rmse(4,i), cog_rmse(4,i));
-    fprintf('%-10s | %-10.2f | %-10.2f | %-10.2f | %-10.2f\n', ...
-            'EKF-CA', pos_rmse(5,i), vel_rmse(5,i), sog_rmse(5,i), cog_rmse(5,i));
+            'EKF-CA', pos_rmse(4,i), vel_rmse(4,i), sog_rmse(4,i), cog_rmse(4,i));
     
     % Find best filter for each metric in this segment
     [~, bestPosIdx] = min(pos_rmse(:,i));
