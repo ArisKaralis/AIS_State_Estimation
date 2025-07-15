@@ -1,0 +1,256 @@
+>> runAISFilters
+
+========= AIS State Estimation Analysis =========
+
+Loading AIS data...
+Loaded 250 AIS points with 17 variables
+
+Running Kalman Filter (CV model)...
+
+Process noise intensity: 0.250
+
+===== KF Performance Statistics =====
+Position RMSE: 11.32 m
+Velocity RMSE: 0.84 m/s
+SOG RMSE: 0.62 m/s
+COG RMSE: 8.07 degrees
+
+Performance by segment:
+Segment         | Pos RMSE (m)    | Vel RMSE (m/s)  | Course RMSE (deg)
+---------------------------------------------------------------------
+Const Vel 1     | 11.19           | 0.90            | 6.51           
+Accel           | 12.25           | 0.89            | 4.78           
+45° Turn        | 11.36           | 0.81            | 3.84           
+Const Vel 2     | 9.87            | 0.77            | 3.88           
+90° Turn        | 11.00           | 0.84            | 4.16           
+Decel           | 12.70           | 0.85            | 14.72          
+Const Vel 3     | 11.29           | 0.79            | 12.61          
+
+Running Extended Kalman Filter Constant Velocity...
+Using process noise intensity q = 0.250
+Detected 78 motion segments in the data
+Initialized with velocity: [3.25, 1.52] m/s
+
+===== EKF-CV Performance Statistics =====
+Position RMSE: 10.50 m
+Velocity RMSE: 0.96 m/s
+SOG RMSE: 0.79 m/s
+COG RMSE: 5.61 degrees
+
+Performance by segment:
+Segment         | Pos RMSE (m)    | Vel RMSE (m/s)  | Course RMSE (deg)
+---------------------------------------------------------------------
+Const Vel 1     | 10.36           | 1.05            | 4.49           
+Accel           | 12.24           | 1.12            | 4.80           
+45° Turn        | 11.12           | 0.96            | 4.12           
+Const Vel 2     | 8.91            | 1.01            | 4.98           
+90° Turn        | 9.86            | 0.91            | 3.74           
+Decel           | 12.05           | 0.90            | 10.05          
+Const Vel 3     | 9.50            | 0.69            | 5.87           
+
+Running Extended Kalman Filter Constant Acceleration...
+Using process noise intensity q = 0.250
+Detected 78 motion segments in the data
+Initialized with velocity: [-0.71, -2.00] m/s, accel: [-0.432, -0.430] m/s²
+
+===== EKF-CA Performance Statistics =====
+Position RMSE: 12.31 m
+Velocity RMSE: 2.60 m/s
+SOG RMSE: 2.18 m/s
+COG RMSE: 18.15 degrees
+
+Performance by segment:
+Segment         | Pos RMSE (m)    | Vel RMSE (m/s)  | Course RMSE (deg)
+---------------------------------------------------------------------
+Const Vel 1     | 13.36           | 5.00            | 27.40          
+Accel           | 13.45           | 1.68            | 8.00           
+45° Turn        | 12.30           | 1.20            | 5.13           
+Const Vel 2     | 10.56           | 1.53            | 7.10           
+90° Turn        | 11.19           | 1.39            | 6.28           
+Decel           | 13.25           | 2.13            | 31.00          
+Const Vel 3     | 12.40           | 2.68            | 22.04          
+
+Running Unscented Kalman Filter...
+UKF: Using process noise intensity q = 0.100
+UKF: Detected 78 motion segments in the data
+UKF: Initialized with velocity: [3.77, 1.87] m/s
+
+===== UKF Performance Statistics =====
+Position RMSE: 10.04 m
+Velocity RMSE: 0.82 m/s
+SOG RMSE: 0.67 m/s
+COG RMSE: 4.94 degrees
+
+Performance by segment:
+Segment         | Pos RMSE (m)    | Vel RMSE (m/s)  | Course RMSE (deg)
+---------------------------------------------------------------------
+Const Vel 1     | 9.69            | 0.88            | 4.12           
+Accel           | 11.79           | 0.96            | 4.28           
+45° Turn        | 10.85           | 0.83            | 3.52           
+Const Vel 2     | 8.48            | 0.83            | 4.36           
+90° Turn        | 9.60            | 0.77            | 3.17           
+Decel           | 11.97           | 0.85            | 8.89           
+Const Vel 3     | 8.29            | 0.60            | 5.12           
+
+Running IMM Filter...
+IMM: Initial model probabilities - CV: 0.500, CTRV: 0.500
+IMM: State size is 4
+Step 50 - CV: 0.000, CTRV: 1.000
+Step 100 - CV: 0.000, CTRV: 1.000
+Step 150 - CV: 0.000, CTRV: 1.000
+Step 200 - CV: 0.000, CTRV: 1.000
+Step 250 - CV: 0.000, CTRV: 1.000
+
+===== IMM (CV+CTRV) Enhanced Performance Statistics =====
+Position RMSE: 11.26 m (Paper target: ~5m)
+Position Max Deviation: 32.89 m
+Position 95th Percentile: 22.07 m
+COG RMSE: 5.56 degrees
+COG Max Deviation: 24.88 degrees
+SOG RMSE: 0.41 m/s
+SOG Max Deviation: 1.62 m/s
+Model Selection: CTRV (99.8% dominant)
+Number of Model Switches: 0
+
+--- Performance by Motion Segment ---
+Segment         | Pos RMSE     | COG RMSE     | Dominant     | CV Prob     
+------------------------------------------------------------------------
+Const Vel 1     | 10.96        | 7.51         | CTRV         | 1.2         %
+Accel           | 13.49        | 4.67         | CTRV         | 0.0         %
+45° Turn        | 9.59         | 3.72         | CTRV         | 0.0         %
+Const Vel 2     | 8.09         | 3.53         | CTRV         | 0.0         %
+90° Turn        | 8.98         | 4.01         | CTRV         | 0.0         %
+Decel           | 18.29        | 7.62         | CTRV         | 0.0         %
+Const Vel 3     | 8.26         | 6.43         | CTRV         | 0.0         %
+
+Comparing filter performance...
+
+===== Overall Filter Performance Summary =====
+Filter     | Pos RMSE   | Vel RMSE   | SOG RMSE   | COG RMSE  
+-------------------------------------------------------------
+KF         | 11.32      | 0.84       | 0.62       | 8.07      
+EKF-CV     | 10.50      | 0.96       | 0.79       | 5.61      
+EKF-CA     | 12.31      | 2.60       | 2.18       | 18.15     
+UKF        | 10.04      | 0.82       | 0.67       | 4.94      
+IMM        | 11.26      | 0.67       | 0.41       | 5.56      
+
+Analyzing performance by motion segment...
+
+===== Filter Performance by Segment =====
+
+Segment 1: Const Vel 1
+Filter     | Pos RMSE   | Vel RMSE   | SOG RMSE   | COG RMSE  
+-------------------------------------------------------------
+KF         | 11.19      | 0.90       | 0.71       | 6.51      
+EKF-CV     | 10.36      | 1.05       | 0.98       | 4.49      
+EKF-CA     | 13.36      | 5.00       | 4.31       | 27.40     
+UKF        | 9.69       | 0.88       | 0.81       | 4.12      
+EKF-CA     | 10.96      | 0.79       | 0.37       | 7.51      
+
+Best filters for this segment:
+Position: UKF (9.69 m)
+Velocity: IMM (0.79 m/s)
+SOG: IMM (0.37 m/s)
+COG: UKF (4.12 degrees)
+
+Segment 2: Accel
+Filter     | Pos RMSE   | Vel RMSE   | SOG RMSE   | COG RMSE  
+-------------------------------------------------------------
+KF         | 12.25      | 0.89       | 0.65       | 4.78      
+EKF-CV     | 12.24      | 1.12       | 0.90       | 4.80      
+EKF-CA     | 13.45      | 1.68       | 1.23       | 8.00      
+UKF        | 11.79      | 0.96       | 0.76       | 4.28      
+EKF-CA     | 13.49      | 0.87       | 0.64       | 4.67      
+
+Best filters for this segment:
+Position: UKF (11.79 m)
+Velocity: IMM (0.87 m/s)
+SOG: IMM (0.64 m/s)
+COG: UKF (4.28 degrees)
+
+Segment 3: 45° Turn
+Filter     | Pos RMSE   | Vel RMSE   | SOG RMSE   | COG RMSE  
+-------------------------------------------------------------
+KF         | 11.36      | 0.81       | 0.60       | 3.84      
+EKF-CV     | 11.12      | 0.96       | 0.77       | 4.12      
+EKF-CA     | 12.30      | 1.20       | 0.96       | 5.13      
+UKF        | 10.85      | 0.83       | 0.67       | 3.52      
+EKF-CA     | 9.59       | 0.53       | 0.13       | 3.72      
+
+Best filters for this segment:
+Position: IMM (9.59 m)
+Velocity: IMM (0.53 m/s)
+SOG: IMM (0.13 m/s)
+COG: UKF (3.52 degrees)
+
+Segment 4: Const Vel 2
+Filter     | Pos RMSE   | Vel RMSE   | SOG RMSE   | COG RMSE  
+-------------------------------------------------------------
+KF         | 9.87       | 0.77       | 0.55       | 3.88      
+EKF-CV     | 8.91       | 1.01       | 0.72       | 4.98      
+EKF-CA     | 10.56      | 1.53       | 1.13       | 7.10      
+UKF        | 8.48       | 0.83       | 0.57       | 4.36      
+EKF-CA     | 8.09       | 0.50       | 0.11       | 3.53      
+
+Best filters for this segment:
+Position: IMM (8.09 m)
+Velocity: IMM (0.50 m/s)
+SOG: IMM (0.11 m/s)
+COG: IMM (3.53 degrees)
+
+Segment 5: 90° Turn
+Filter     | Pos RMSE   | Vel RMSE   | SOG RMSE   | COG RMSE  
+-------------------------------------------------------------
+KF         | 11.00      | 0.84       | 0.60       | 4.16      
+EKF-CV     | 9.86       | 0.91       | 0.75       | 3.74      
+EKF-CA     | 11.19      | 1.39       | 1.07       | 6.28      
+UKF        | 9.60       | 0.77       | 0.63       | 3.17      
+EKF-CA     | 8.98       | 0.57       | 0.12       | 4.01      
+
+Best filters for this segment:
+Position: IMM (8.98 m)
+Velocity: IMM (0.57 m/s)
+SOG: IMM (0.12 m/s)
+COG: UKF (3.17 degrees)
+
+Segment 6: Decel
+Filter     | Pos RMSE   | Vel RMSE   | SOG RMSE   | COG RMSE  
+-------------------------------------------------------------
+KF         | 12.70      | 0.85       | 0.58       | 14.72     
+EKF-CV     | 12.05      | 0.90       | 0.69       | 10.05     
+EKF-CA     | 13.25      | 2.13       | 1.51       | 31.00     
+UKF        | 11.97      | 0.85       | 0.70       | 8.89      
+EKF-CA     | 18.29      | 0.96       | 0.86       | 7.62      
+
+Best filters for this segment:
+Position: UKF (11.97 m)
+Velocity: UKF (0.85 m/s)
+SOG: KF (0.58 m/s)
+COG: IMM (7.62 degrees)
+
+Segment 7: Const Vel 3
+Filter     | Pos RMSE   | Vel RMSE   | SOG RMSE   | COG RMSE  
+-------------------------------------------------------------
+KF         | 11.29      | 0.79       | 0.60       | 12.61     
+EKF-CV     | 9.50       | 0.69       | 0.65       | 5.87      
+EKF-CA     | 12.40      | 2.68       | 2.38       | 22.04     
+UKF        | 8.29       | 0.60       | 0.57       | 5.12      
+EKF-CA     | 8.26       | 0.31       | 0.14       | 6.43      
+
+Best filters for this segment:
+Position: IMM (8.26 m)
+Velocity: IMM (0.31 m/s)
+SOG: IMM (0.14 m/s)
+COG: UKF (5.12 degrees)
+
+===== Best Overall Filter by Segment =====
+Segment 1 (Const Vel 1): Best filter is UKF
+Segment 2 (Accel): Best filter is KF
+Segment 3 (45° Turn): Best filter is IMM
+Segment 4 (Const Vel 2): Best filter is IMM
+Segment 5 (90° Turn): Best filter is IMM
+Segment 6 (Decel): Best filter is UKF
+Segment 7 (Const Vel 3): Best filter is IMM
+
+========= Analysis Complete =========
+>> 
