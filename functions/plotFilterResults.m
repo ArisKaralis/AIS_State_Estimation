@@ -5,10 +5,10 @@ figure;
 
 % Plot trajectory
 subplot(2, 2, 1);
-plot(data.x, data.y, 'k.', 'MarkerSize', 10, 'DisplayName', 'Measurements');
+builtin('plot', data.x, data.y, 'k.', 'MarkerSize', 10, 'DisplayName', 'Measurements');
 hold on;
-plot(data.x_true, data.y_true, 'k-', 'LineWidth', 1.5, 'DisplayName', 'Ground Truth');
-plot(estimates.x_est, estimates.y_est, 'r-', 'LineWidth', 1.5, 'DisplayName', 'Filter');
+builtin('plot', data.x_true, data.y_true, 'k-', 'LineWidth', 1.5, 'DisplayName', 'Ground Truth');
+builtin('plot', estimates.x_est, estimates.y_est, 'r-', 'LineWidth', 1.5, 'DisplayName', 'Filter');
 
 xlabel('X (meters)');
 ylabel('Y (meters)');
@@ -22,15 +22,15 @@ subplot(2, 2, 2);
 % Sample indices
 t = 1:height(data);
 
-plot(t, data.SOG, 'k.', 'MarkerSize', 5, 'DisplayName', 'Measurements');
+builtin('plot', t, data.SOG, 'k.', 'MarkerSize', 5, 'DisplayName', 'Measurements');
 hold on;
-plot(t, data.sog_true, 'k-', 'LineWidth', 1.5, 'DisplayName', 'Ground Truth');
-plot(t, estimates.sog_est, 'r-', 'LineWidth', 1.5, 'DisplayName', 'Filter');
+builtin('plot', t, data.sog_true, 'k-', 'LineWidth', 1.5, 'DisplayName', 'Ground Truth');
+builtin('plot', t, estimates.sog_est, 'r-', 'LineWidth', 1.5, 'DisplayName', 'Filter');
 
 % Add segment boundaries
 segmentChanges = find(diff(data.segment) ~= 0);
 for i = 1:length(segmentChanges)
-    xline(segmentChanges(i)+1, 'k--');
+    xline(segmentChanges(i)+1, 'k--', 'HandleVisibility', 'off');
 end
 
 xlabel('Sample number');
@@ -41,10 +41,10 @@ grid on;
 
 % Plot course
 subplot(2, 2, 3);
-plot(t, data.COG, 'k.', 'MarkerSize', 5, 'DisplayName', 'Measurements');
+builtin('plot', t, data.COG, 'k.', 'MarkerSize', 5, 'DisplayName', 'Measurements');
 hold on;
-plot(t, data.cog_true, 'k-', 'LineWidth', 1.5, 'DisplayName', 'Ground Truth');
-plot(t, estimates.cog_est, 'r-', 'LineWidth', 1.5, 'DisplayName', 'Filter');
+builtin('plot', t, data.cog_true, 'k-', 'LineWidth', 1.5, 'DisplayName', 'Ground Truth');
+builtin('plot', t, estimates.cog_est, 'r-', 'LineWidth', 1.5, 'DisplayName', 'Filter');
 
 % Add segment boundaries
 for i = 1:length(segmentChanges)
@@ -60,7 +60,7 @@ grid on;
 % Plot position error
 subplot(2, 2, 4);
 posError = sqrt((estimates.x_est - data.x_true).^2 + (estimates.y_est - data.y_true).^2);
-plot(t, posError, 'b-', 'LineWidth', 1.5);
+builtin('plot', t, posError, 'b-', 'LineWidth', 1.5);
 
 % Add segment boundaries
 for i = 1:length(segmentChanges)
@@ -88,6 +88,9 @@ filterName = strrep(filterName, ')', '');
 filterName = strrep(filterName, '+', 'and');
 filterName = lower(filterName);
 
-saveas(gcf, ['figures/', filterName, '_results.png']);
-saveas(gcf, ['figures/', filterName, '_results.fig']);
+saveas(gcf, sprintf('figures/%s_results.png', filterName));
+saveas(gcf, sprintf('figures/%s_results.fig', filterName));
+
+fprintf('Plots saved to figures/%s_results.png/.fig\n', filterName);
+
 end

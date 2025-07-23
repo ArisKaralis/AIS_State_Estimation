@@ -289,9 +289,9 @@ params.decelDuration = 30;              % Constant deceleration
 params.constVel3Duration = 35;          % Final constant velocity
 
 % Measurement noise parameters
-params.positionNoise = 10;               % Position noise std dev (meters)
+params.positionNoise = 5;               % Position noise std dev (meters)
 params.speedNoise = 1;                % Speed noise std dev (m/s)
-params.courseNoise = 5;                 % Course noise std dev (degrees)
+params.courseNoise = 2;                 % Course noise std dev (degrees)
 
 % Segment names
 params.segmentNames = {'Const Vel 1', 'Accel', '45° Turn', 'Const Vel 2', ...

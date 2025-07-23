@@ -80,4 +80,3 @@ end
 % Add segment stats to overall stats
 stats.segmentStats = segStats;
 end
-

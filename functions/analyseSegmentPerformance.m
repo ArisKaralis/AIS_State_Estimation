@@ -135,7 +135,7 @@ for i = 1:numSegments
     fprintf('%-10s | %-10.2f | %-10.2f | %-10.2f | %-10.2f\n', ...
             'UKF', pos_rmse(4,i), vel_rmse(4,i), sog_rmse(4,i), cog_rmse(4,i));
     fprintf('%-10s | %-10.2f | %-10.2f | %-10.2f | %-10.2f\n', ...
-            'EKF-CA', pos_rmse(5,i), vel_rmse(5,i), sog_rmse(5,i), cog_rmse(5,i));
+            'IMM', pos_rmse(5,i), vel_rmse(5,i), sog_rmse(5,i), cog_rmse(5,i));
     
     % Find best filter for each metric in this segment
     [~, bestPosIdx] = min(pos_rmse(:,i));
