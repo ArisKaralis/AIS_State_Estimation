@@ -18,12 +18,14 @@ end
 
 data = readtable(dataPath);
 fprintf('Loaded %d AIS points with %d variables\n', height(data), width(data));
-q_kf=0.062;
-q_ekf_cv = 0.15;
-q_ekf_ca = 0.05;
-q_ukf = 0.1; 
+q_kf=0.974;
+q_ekf_cv = 0.953;
+q_ekf_ca = 0.003;
+q_ekf_ctrv = 0.264;
+q_ukf_cv = 1.370; 
+q_ukf_ctrv = 1.205; 
 q_imm_cv = 0.005;
-q_imm_ctrv = 0.005;
+q_imm_ctrv = 0.205;
 q_imm_ca = 0.0025;
 
 % % Run all filters
@@ -36,19 +38,29 @@ fprintf('\nRunning Extended Kalman Filter Constant Velocity...\n');
 fprintf('\nRunning Extended Kalman Filter Constant Acceleraction...\n');
 [ekf_ca_estimates, ekf_ca_stats] = runExtendedKalmanFilterCA(data, q_ekf_ca);
 
+fprintf('\nRunning Extended Kalman Filter Constant Turn Rate Velocity...\n');
+[ekf_ca_estimates, ekf_ca_stats] = runExtendedKalmanFilterCTRV(data, q_ekf_ctrv);
+
 fprintf('\nRunning Unscented Kalman Filter...\n');
-[ukf_estimates, ukf_stats] = runUnscentedKalmanFilter(data, q_ukf);
+[ukf_estimates, ukf_stats] = runUnscentedKalmanFilterCV(data, q_ukf_cv);
+
+fprintf('\nRunning Unscented Kalman Filter...\n');
+[ukf_estimates, ukf_stats] = runUnscentedKalmanFilterCTRV(data, q_ukf_ctrv);
 
 fprintf('\nRunning IMM Filter...\n');
-[imm_estimates, imm_stats] = runIMMFilterWithExistingModels(data, q_kf, q_ekf_ca, q_ukf);
+[imm_estimates, imm_stats] = runIMMFilterEKF(data, q_ekf_cv, q_ekf_ca, q_ukf);
 
-% Compare filter performance
-fprintf('\nComparing filter performance...\n');
-compareFilterPerformance(data, kf_estimates, ekf_cv_estimates, ekf_ca_estimates, ukf_estimates, imm_estimates);
-
-% Analyze performance by segment
-fprintf('\nAnalyzing performance by motion segment...\n');
-analyseSegmentPerformance(data, kf_estimates, ekf_cv_estimates, ekf_ca_estimates, ukf_estimates, imm_estimates);
+% 
+% fprintf('\nRunning IMM Filter...\n');
+% [imm_estimates, imm_stats] = runIMMFilterWithExistingModels(data, q_kf, q_ekf_ca, q_ukf);
+% 
+% % Compare filter performance
+% fprintf('\nComparing filter performance...\n');
+% compareFilterPerformance(data, kf_estimates, ekf_cv_estimates, ekf_ca_estimates, ukf_estimates, imm_estimates);
+% 
+% % Analyze performance by segment
+% fprintf('\nAnalyzing performance by motion segment...\n');
+% analyseSegmentPerformance(data, kf_estimates, ekf_cv_estimates, ekf_ca_estimates, ukf_estimates, imm_estimates);
 
 fprintf('\n========= Analysis Complete =========\n');
 end
