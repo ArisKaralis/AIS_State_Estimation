@@ -19,9 +19,9 @@ data = readtable(dataPath);
 fprintf('Loaded %d AIS points\n', height(data));
 
 % Define q values to test
-q_min = 0.4;
-q_max = 0.5;
-num_q_values = 20;
+q_min = 0.001;
+q_max = 1;
+num_q_values = 50;
 q_values = linspace(q_min, q_max, num_q_values);
 
 % Choose which filter to test (change this to test different filters)
@@ -50,17 +50,17 @@ for i = 1:num_q_values
         % Run the selected filter
         switch filter_to_test
             case 'KF'
-                [estimates, stats] = runKalmanFilter(data, q);
+                [estimates, stats] = runKF(data, q);
             case 'EKF-CV'
-                [estimates, stats] = runExtendedKalmanFilterCV(data, q);
+                [estimates, stats] = runEKFCV(data, q);
             case 'EKF-CA'
-                [estimates, stats] = runExtendedKalmanFilterCA(data, q);
+                [estimates, stats] = runEKFCA(data, q);
             case 'EKF-CTRV'
-                [estimates, stats] = runExtendedKalmanFilterCTRV(data, q);
+                [estimates, stats] = runEKFCTRV(data, q);
             case 'UKF-CV'
-                [estimates, stats] = runUnscentedKalmanFilter(data, q);
+                [estimates, stats] = runUKFCV(data, q);
             case 'UKF-CTRV'
-                [estimates, stats] = runUnscentedKalmanFilterCTRV(data, q);
+                [estimates, stats] = runUKFCTRV(data, q);
             case 'IMM'
                 [estimates, stats] = runIMMFilter(data, q, q, q);
             otherwise

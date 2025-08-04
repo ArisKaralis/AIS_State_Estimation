@@ -41,10 +41,24 @@ grid on;
 
 % Plot course
 subplot(2, 2, 3);
-builtin('plot', t, data.COG, 'k.', 'MarkerSize', 5, 'DisplayName', 'Measurements');
+
+% --- Fix for COG wrapping using MATLAB's unwrap function ---
+% Convert all course data to radians first
+cog_meas_rad = deg2rad(data.COG);
+cog_true_rad = deg2rad(data.cog_true);
+cog_est_rad = deg2rad(estimates.cog_est);
+
+% Unwrap all angles to remove discontinuities
+cog_meas_unwrapped = rad2deg(unwrap(cog_meas_rad));
+cog_true_unwrapped = rad2deg(unwrap(cog_true_rad));
+cog_est_unwrapped = rad2deg(unwrap(cog_est_rad));
+
+% Plot with all unwrapped angles
+builtin('plot', t, cog_meas_unwrapped, 'k.', 'MarkerSize', 5, 'DisplayName', 'Measurements');
 hold on;
-builtin('plot', t, data.cog_true, 'k-', 'LineWidth', 1.5, 'DisplayName', 'Ground Truth');
-builtin('plot', t, estimates.cog_est, 'r-', 'LineWidth', 1.5, 'DisplayName', 'Filter');
+builtin('plot', t, cog_true_unwrapped, 'k-', 'LineWidth', 1.5, 'DisplayName', 'Ground Truth');
+builtin('plot', t, cog_est_unwrapped, 'r-', 'LineWidth', 1.5, 'DisplayName', 'Filter');
+% --- End of fix ---
 
 % Add segment boundaries
 for i = 1:length(segmentChanges)
@@ -67,7 +81,6 @@ for i = 1:length(segmentChanges)
     xline(segmentChanges(i)+1, 'k--', 'HandleVisibility', 'off');
 end
 
-
 xlabel('Sample number');
 ylabel('Error (m)');
 title('Position Error');
@@ -81,15 +94,15 @@ if ~exist('figures', 'dir')
     mkdir('figures');
 end
 
-% Save figure
-filterName = strrep(filterTitle, ' ', '_');
+% Save the figure
+filterName = strrep(lower(filterTitle), ' ', '_');
+filterName = strrep(filterName, '-', '_');
 filterName = strrep(filterName, '(', '');
 filterName = strrep(filterName, ')', '');
-filterName = strrep(filterName, '+', 'and');
-filterName = lower(filterName);
 
-saveas(gcf, sprintf('figures/%s_results.png', filterName));
-saveas(gcf, sprintf('figures/%s_results.fig', filterName));
+% Save as both PNG and FIG
+saveas(gcf, fullfile('figures', [filterName '_results.png']));
+savefig(fullfile('figures', [filterName '_results.fig']));
 
 fprintf('Plots saved to figures/%s_results.png/.fig\n', filterName);
 

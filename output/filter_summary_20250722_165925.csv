@@ -1,6 +1,0 @@
-Filter,Position_RMSE_Mean,Position_RMSE_Std,Runtime_Mean,Runtime_Std,Relative_Performance
-KF,NaN,NaN,NaN,NaN,NaN
-EKF_CV,NaN,NaN,NaN,NaN,NaN
-EKF_CA,NaN,NaN,NaN,NaN,NaN
-UKF,NaN,NaN,NaN,NaN,NaN
-IMM,NaN,NaN,NaN,NaN,NaN

@@ -1,23 +1,21 @@
-function [estimates, stats] = runIMMFilterEKF(data, q_cv, q_ca, q_ctrv, pos_std, vel_std, acc_std)
+function [estimates, stats] = runIMMEKF2(data, q_cv, q_ctrv, pos_std, vel_std)
     % RUNIMMFILTEREKF - IMM filter using existing modular EKF implementations
     % Uses ekfCV.m, ekfCA.m, and ekfCTRV.m directly
     
-    fprintf('Starting IMM-EKF with process noise intensities: CV=%.3f, CA=%.3f, CTRV=%.3f\n', q_cv, q_ca, q_ctrv);
+    fprintf('Starting IMM-EKF with process noise intensities: CV=%.3f, CTRV=%.3f\n', q_cv, q_ctrv);
     
     n = height(data);
-    num_models = 3;
+    num_models = 2;
     
     % IMM parameters
-    model_probs = [0.95, 0.05, 0.05];  % Initial probabilities [CV, CA, CTRV]
-    transition_matrix = [0.95, 0.025, 0.025;   % CV -> [CV, CA, CTRV]
-                        0.025, 0.95, 0.025;    % CA -> [CV, CA, CTRV]
-                        0.025, 0.025, 0.95];   % CTRV -> [CV, CA, CTRV]
+    model_probs = [0.95, 0.05];  % Initial probabilities [CV, CA, CTRV]
+    transition_matrix = [0.9, 0.1;   % CV -> [CV, CA, CTRV]
+                        0.1, 0.9];   % CTRV -> [CV, CA, CTRV]
+     
     
-  
     % Run each filter separately using existing functions
     fprintf('Running individual EKF models...\n');
     [x_est_cv, P_est_cv] = ekfCV(data, q_cv, pos_std, vel_std);
-    [x_est_ca, P_est_ca] = ekfCA(data, q_ca, pos_std, vel_std, acc_std);
     [x_est_ctrv, P_est_ctrv] = ekfCTRV(data, q_ctrv, pos_std, vel_std);
     
     % Initialize storage for IMM results
@@ -46,7 +44,6 @@ function [estimates, stats] = runIMMFilterEKF(data, q_cv, q_ca, q_ctrv, pos_std,
     for k = 2:n
         % Extract states from each model at time k
         state_cv = [x_est_cv(1,k); x_est_cv(2,k); x_est_cv(3,k); x_est_cv(4,k)];  % [x, vx, y, vy]
-        state_ca = [x_est_ca(1,k); x_est_ca(2,k); x_est_ca(4,k); x_est_ca(5,k)];  % [x, vx, y, vy] from [x,vx,ax,y,vy,ay]
         
         % Convert CTRV state to CV format for combination
         px_ctrv = x_est_ctrv(1,k);
@@ -60,13 +57,7 @@ function [estimates, stats] = runIMMFilterEKF(data, q_cv, q_ca, q_ctrv, pos_std,
         % Extract covariances (convert to position-velocity format)
         P_cv = P_est_cv(:,:,k);
         
-        % Convert CA covariance to CV format
-        P_ca_full = P_est_ca(:,:,k);
-        P_ca = [P_ca_full(1,1), P_ca_full(1,2), P_ca_full(1,4), P_ca_full(1,5);
-                P_ca_full(2,1), P_ca_full(2,2), P_ca_full(2,4), P_ca_full(2,5);
-                P_ca_full(4,1), P_ca_full(4,2), P_ca_full(4,4), P_ca_full(4,5);
-                P_ca_full(5,1), P_ca_full(5,2), P_ca_full(5,4), P_ca_full(5,5)];
-        
+
         % Convert CTRV covariance to CV format (approximate)
         P_ctrv_full = P_est_ctrv(:,:,k);
         % Jacobian for CTRV to CV transformation
@@ -86,15 +77,11 @@ function [estimates, stats] = runIMMFilterEKF(data, q_cv, q_ca, q_ctrv, pos_std,
         S_cv = H * P_cv * H' + R;
         likelihood_cv = calculateGaussianLikelihood(innovation_cv, S_cv);
         
-        innovation_ca = z - H * state_ca;
-        S_ca = H * P_ca * H' + R;
-        likelihood_ca = calculateGaussianLikelihood(innovation_ca, S_ca);
-        
         innovation_ctrv = z - H * state_ctrv;
         S_ctrv = H * P_ctrv * H' + R;
         likelihood_ctrv = calculateGaussianLikelihood(innovation_ctrv, S_ctrv);
         
-        likelihoods = [likelihood_cv; likelihood_ca; likelihood_ctrv];
+        likelihoods = [likelihood_cv; likelihood_ctrv];
         
         % Handle numerical issues
         likelihoods = max(likelihoods, 1e-10);
@@ -104,7 +91,7 @@ function [estimates, stats] = runIMMFilterEKF(data, q_cv, q_ca, q_ctrv, pos_std,
         unnormalized_probs = predicted_probs .* likelihoods;
         
         if sum(unnormalized_probs) < 1e-10
-            model_probs = [1/3, 1/3, 1/3];
+            model_probs = [1/2, 1/2];
         else
             model_probs = unnormalized_probs / sum(unnormalized_probs);
             model_probs = model_probs';
@@ -114,8 +101,7 @@ function [estimates, stats] = runIMMFilterEKF(data, q_cv, q_ca, q_ctrv, pos_std,
         
         % Combine estimates using model probabilities
         combined_state = model_probs(1) * state_cv + ...
-                        model_probs(2) * state_ca + ...
-                        model_probs(3) * state_ctrv;
+                        model_probs(2) * state_ctrv;
         
         % Store combined estimates
         estimates.x_est(k) = combined_state(1);
@@ -131,8 +117,7 @@ function [estimates, stats] = runIMMFilterEKF(data, q_cv, q_ca, q_ctrv, pos_std,
     
     % Store model probabilities for analysis
     estimates.model_probs_cv = model_probs_history(1, :)';
-    estimates.model_probs_ca = model_probs_history(2, :)';
-    estimates.model_probs_ctrv = model_probs_history(3, :)';
+    estimates.model_probs_ctrv = model_probs_history(2, :)';
     
     % Calculate statistics
     stats = calculateFilterStats(estimates, data, 'IMM-EKF');
@@ -150,7 +135,7 @@ function [estimates, stats] = runIMMFilterEKF(data, q_cv, q_ca, q_ctrv, pos_std,
     stats.cog_rmse = sqrt(mean(cog_errors.^2));
     
     % Generate plots using the dedicated plotting function
-    % plotIMMResults(data, estimates, 'IMM-3', {'CV', 'CA', 'CTRV'});
+    % plotIMMResults(data, estimates, 'IMM-2', {'CV', 'CTRV'});
 end
 
 function likelihood = calculateGaussianLikelihood(innovation, S)

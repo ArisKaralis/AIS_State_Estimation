@@ -1,9 +1,0 @@
-# Synthetic Data Report
-Generated 250 AIS reports with specific motion patterns
-Data saved to: data/specific_ais_movement.csv
-Total trajectory duration: 41.7 minutes
-
-===== Measurement Error Statistics =====
-Position RMSE: 14.10 meters
-Speed RMSE: 0.98 m/s
-Course RMSE: 5.02 degrees

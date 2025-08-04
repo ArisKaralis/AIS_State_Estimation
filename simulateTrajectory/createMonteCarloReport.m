@@ -23,7 +23,7 @@ plotErrorHistogram(results, 'course', 'Course Error (rad)');
 
 % Trajectory examples
 subplot(2, 3, 4);
-plotTrajectoryExamples(results,  10);
+plotTrajectoryExamples(results,  3);
 
 % Motion mode statistics
 subplot(2, 3, 5);

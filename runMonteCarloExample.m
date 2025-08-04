@@ -15,9 +15,8 @@
 %   - Statistical summary printed to console
 %   - Sample AIS dataset exported as CSV
 %   - Visual analysis report generated automatically
-
 clear all;
-addpath('functions');
+addpath('simulateTrajectory');
 
 % STEP 1: GET DEFAULT PARAMETERS
 % Load standard simulation parameters based on real-world AIS systems
@@ -95,7 +94,7 @@ fprintf('Dataset contains: %d AIS reports with ground truth\n', height(aisData))
 
 % STEP 6: DEBUGGING INFORMATION
 % Provide detailed information about data generation quality
-fprintf('\n=== DEBUG INFO ===\n');
+fprintf('\n=== INFO ===\n');
 fprintf('First run data quality check:\n');
 fprintf('  Available observations in run 1: %d\n', sum(results.runs{1}.observations.available));
 fprintf('  Total observations in run 1: %d\n', length(results.runs{1}.observations.available));
