@@ -1,4 +1,4 @@
-function [x_est, P_est] = ekfCA(data, q, pos_std, vel_std, acc_std)
+function [x_est, P_est, innovations, S_innovations] = ekfCA(data, q, pos_std, vel_std, acc_std)
     % EXTENDEDKALMANFILTERCA - Core EKF implementation for CA model
     
     n = height(data);
@@ -27,7 +27,7 @@ function [x_est, P_est] = ekfCA(data, q, pos_std, vel_std, acc_std)
     % Create trackingEKF instead of trackingKF
     ekf = trackingEKF(@caStateTransitionFcn, @caMeasurementFcn, ...
                      [data.x(1); initial_vx; initial_ax; data.y(1); initial_vy; initial_ay], ...
-                     'StateCovariance', diag([pos_std^2/4, vel_std^2, acc_std^2, pos_std^2/4, vel_std^2, acc_std^2]), ...
+                     'StateCovariance', diag([pos_std^2, vel_std^2*4, acc_std^2*16, pos_std^2, vel_std^2*4, acc_std^2*16]), ...
                      'MeasurementNoise', diag([pos_std^2, pos_std^2]));
     
     % Set the Jacobian functions for trackingEKF
@@ -38,8 +38,19 @@ function [x_est, P_est] = ekfCA(data, q, pos_std, vel_std, acc_std)
     x_est = zeros(6, n);
     P_est = zeros(6, 6, n);
     
+    % Initialize innovation tracking (optional outputs)
+    if nargout >= 3
+        innovations = zeros(2, n);        % For position measurements [x; y]
+        S_innovations = zeros(2, 2, n);   % Innovation covariance matrices
+    end
+    
     x_est(:,1) = ekf.State;
     P_est(:,:,1) = ekf.StateCovariance;
+    
+    if nargout >= 3
+        innovations(:,1) = NaN;  % No innovation for initial state
+        S_innovations(:,:,1) = NaN;
+    end
     
     % Main filtering loop
     for k = 2:n
@@ -66,6 +77,18 @@ function [x_est, P_est] = ekfCA(data, q, pos_std, vel_std, acc_std)
         
         if ~isnan(data.x(k)) && ~isnan(data.y(k))
             z = [data.x(k); data.y(k)];
+            
+            % Calculate innovation for NIS (before correction)
+            if nargout >= 3
+                H = caMeasurementJacobianFcn(ekf.State);
+                z_pred = caMeasurementFcn(ekf.State);
+                innovation = z - z_pred;
+                S = H * ekf.StateCovariance * H' + diag([pos_std^2, pos_std^2]);
+                
+                innovations(:,k) = innovation;
+                S_innovations(:,:,k) = S;
+            end
+            
             [x_est(:,k), P_est(:,:,k)] = correct(ekf, z);
             
             x_est(3,k) = max(-max_accel, min(max_accel, x_est(3,k)));
@@ -74,6 +97,11 @@ function [x_est, P_est] = ekfCA(data, q, pos_std, vel_std, acc_std)
         else
             x_est(:,k) = ekf.State;
             P_est(:,:,k) = ekf.StateCovariance;
+            
+            if nargout >= 3
+                innovations(:,k) = NaN;
+                S_innovations(:,:,k) = NaN;
+            end
         end
     end
 end

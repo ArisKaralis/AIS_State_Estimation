@@ -66,7 +66,7 @@ end
 % Format plot
 xlabel('X Position (m)');
 ylabel('Y Position (m)');
-title('Sample Monte Carlo Trajectories');
+title('Sample Trajectories');
 grid on;
 axis equal;
 

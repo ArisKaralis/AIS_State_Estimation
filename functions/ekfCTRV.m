@@ -1,4 +1,4 @@
-function [x_est, P_est] = ekfCTRV(data, q, pos_std, vel_std)
+function [x_est, P_est, innovations, S_innovations] = ekfCTRV(data, q, pos_std, vel_std)
     % EXTENDEDKALMANFILTERCTRV - Core EKF implementation for CTRV model
     % State: [x, y, v, yaw, yaw_rate]
     
@@ -43,7 +43,7 @@ function [x_est, P_est] = ekfCTRV(data, q, pos_std, vel_std)
     
     % Initialize state and covariance
     ekf.State = [data.x(1); data.y(1); initial_speed; initial_yaw; initial_yaw_rate];
-    ekf.StateCovariance = diag([pos_std^2/4, pos_std^2/4, vel_std^2, deg2rad(15)^2, deg2rad(2)^2]);
+    ekf.StateCovariance = diag([pos_std^2/2, pos_std^2/2, vel_std^2 *4, deg2rad(5)^2, deg2rad(1)^2]);
     
     % Measurement noise (position only)
     R_pos = diag([pos_std^2, pos_std^2]);
@@ -52,8 +52,19 @@ function [x_est, P_est] = ekfCTRV(data, q, pos_std, vel_std)
     x_est = zeros(5, n);
     P_est = zeros(5, 5, n);
     
+    % Initialize innovation tracking (optional outputs)
+    if nargout >= 3
+        innovations = zeros(2, n);        % For position measurements [x; y]
+        S_innovations = zeros(2, 2, n);   % Innovation covariance matrices
+    end
+    
     x_est(:,1) = ekf.State;
     P_est(:,:,1) = ekf.StateCovariance;
+    
+    if nargout >= 3
+        innovations(:,1) = NaN;  % No innovation for initial state
+        S_innovations(:,:,1) = NaN;
+    end
     
     % Main filtering loop
     for k = 2:n
@@ -63,7 +74,7 @@ function [x_est, P_est] = ekfCTRV(data, q, pos_std, vel_std)
         end
         
         % Process noise matrix
-        Q = q * diag([dt_k^3/3, dt_k^3/3, dt_k, deg2rad(1)^2*dt_k, deg2rad(0.5)^2*dt_k]);
+        Q = q * diag([dt_k^3/3, dt_k^3/3, dt_k, deg2rad(0.5)^2*dt_k, deg2rad(0.2)^2*dt_k]);
         
         ekf.ProcessNoise = Q;
         
@@ -76,11 +87,29 @@ function [x_est, P_est] = ekfCTRV(data, q, pos_std, vel_std)
         % Measurement update
         if ~isnan(data.x(k)) && ~isnan(data.y(k))
             z = [data.x(k); data.y(k)];
+            
+            % Calculate innovation before correction (for NIS)
+            if nargout >= 3
+                H = ctrvMeasurementJacobianFcn(ekf.State);
+                z_pred = ctrvMeasurementFcn(ekf.State);
+                innovation = z - z_pred;
+                S = H * ekf.StateCovariance * H' + R_pos;
+                
+                % Store innovation data
+                innovations(:,k) = innovation;
+                S_innovations(:,:,k) = S;
+            end
+            
             ekf.MeasurementNoise = R_pos;
             correct(ekf, z);
             
             % Normalize yaw angle after correction
             ekf.State(4) = mod(ekf.State(4) + pi, 2*pi) - pi;
+        else
+            if nargout >= 3
+                innovations(:,k) = NaN;
+                S_innovations(:,:,k) = NaN;
+            end
         end
         
         x_est(:,k) = ekf.State;
@@ -97,19 +126,14 @@ function x_pred = ctrvStateTransitionFcn(x, dt)
     yaw_rate = x(5);
     
     if abs(yaw_rate) < 1e-4
-        % Nearly constant velocity (straight line)
         px_pred = px + v * cos(yaw) * dt;
         py_pred = py + v * sin(yaw) * dt;
         yaw_pred = yaw;
     else
-        % Constant turn rate and velocity
-        px_pred = px + (v / yaw_rate) * (sin(yaw + yaw_rate * dt) - sin(yaw));
-        py_pred = py + (v / yaw_rate) * (-cos(yaw + yaw_rate * dt) + cos(yaw));
+        px_pred = px + (v/yaw_rate) * (sin(yaw + yaw_rate*dt) - sin(yaw));
+        py_pred = py + (v/yaw_rate) * (-cos(yaw + yaw_rate*dt) + cos(yaw));
         yaw_pred = yaw + yaw_rate * dt;
     end
-    
-    % Normalize yaw
-    yaw_pred = mod(yaw_pred + pi, 2*pi) - pi;
     
     x_pred = [px_pred; py_pred; v; yaw_pred; yaw_rate];
 end
@@ -137,24 +161,23 @@ function F = ctrvStateTransitionJacobianFcn(x, dt)
         cos_yaw_dt = cos(yaw + yaw_rate * dt);
         
         F(1,3) = (sin_yaw_dt - sin_yaw) / yaw_rate;
-        F(1,4) = (v / yaw_rate) * (cos_yaw_dt - cos_yaw);
-        F(1,5) = (v / yaw_rate^2) * (sin_yaw - sin_yaw_dt) + (v * dt / yaw_rate) * cos_yaw_dt;
+        F(1,4) = (v/yaw_rate) * (cos_yaw_dt - cos_yaw);
+        F(1,5) = (v/(yaw_rate^2)) * (sin_yaw - sin_yaw_dt) + (v*dt/yaw_rate) * cos_yaw_dt;
         
         F(2,3) = (-cos_yaw_dt + cos_yaw) / yaw_rate;
-        F(2,4) = (v / yaw_rate) * (sin_yaw_dt - sin_yaw);
-        F(2,5) = (v / yaw_rate^2) * (cos_yaw_dt - cos_yaw) + (v * dt / yaw_rate) * sin_yaw_dt;
+        F(2,4) = (v/yaw_rate) * (sin_yaw_dt - sin_yaw);
+        F(2,5) = (v/(yaw_rate^2)) * (-cos_yaw + cos_yaw_dt) + (v*dt/yaw_rate) * sin_yaw_dt;
         
         F(4,5) = dt;
     end
 end
 
-% CTRV Measurement function (position only)
+% CTRV Measurement function
 function z = ctrvMeasurementFcn(x)
-    z = [x(1); x(2)];  % Position measurement
+    z = [x(1); x(2)];  % Position measurements only
 end
 
 % CTRV Measurement Jacobian
 function H = ctrvMeasurementJacobianFcn(x)
-    H = [1 0 0 0 0;    % dx/d[px,py,v,yaw,yaw_rate]
-         0 1 0 0 0];   % dy/d[px,py,v,yaw,yaw_rate]
+    H = [1 0 0 0 0; 0 1 0 0 0];  % Position measurements only
 end

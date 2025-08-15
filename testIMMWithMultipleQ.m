@@ -42,6 +42,8 @@ results.combined_score = zeros(1, total_combinations);
 % Test all combinations
 combo_idx = 1;
 start_time = tic;
+pos_std = 15;
+vel_std = 1;
 
 for i = 1:num_q_values
     for j = 1:num_q_values
@@ -53,7 +55,7 @@ for i = 1:num_q_values
         
         try
             % Run 2-model IMM filter with current Q values
-            [estimates, stats] = runIMMEKF2(data, q_cv, q_ctrv);
+            [estimates, stats] = runIMMEKF2(data, q_cv, q_ctrv, pos_std, vel_std);
             
             % Store Q values
             results.q_cv(combo_idx) = q_cv;

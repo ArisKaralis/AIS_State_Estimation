@@ -72,7 +72,7 @@ function mode = selectWeightedMode()
 % CV: 70% (steady cruise), CA: 15% (speed changes), CT: 15% (course changes)
 
     modes = {'CV', 'CA', 'CT'};
-    weights = [0.70, 0.15, 0.15];  % Realistic operational probabilities
+    weights = [0.90, 0.04, 0.06];  % Realistic operational probabilities
     
     r = rand();
     cumWeight = 0;

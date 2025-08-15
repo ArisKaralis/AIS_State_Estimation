@@ -1,5 +1,5 @@
 function compareFilterPerformance(data, filter_estimates)
-% COMPAREFILTERPERFORMANCE - Compare and visualize performance across filters
+% COMPAREFILTERPERFORMANCE - Compare and visualize performance across filters with NEES/NIS
 % 
 % Inputs:
 %   data - Table with ground truth and measurement data
@@ -28,11 +28,14 @@ plotFilterComparison(data, filter_estimates);
 
 % Calculate comprehensive performance metrics
 rmse_summary = zeros(num_filters, 4);
+nees_summary = zeros(num_filters, 4); % [mean, median, std, consistency]
+nis_summary = zeros(num_filters, 4);  % [mean, median, std, consistency]
 filter_labels = cell(num_filters, 1);
 
-fprintf('\n%-15s | %-12s | %-12s | %-12s | %-12s\n', ...
-        'Filter', 'Pos RMSE (m)', 'Vel RMSE (m/s)', 'SOG RMSE (m/s)', 'COG RMSE (deg)');
-fprintf('--------------------------------------------------------------------------------\n');
+fprintf('\n%-15s | %-12s | %-12s | %-12s | %-12s | %-10s | %-10s | %-8s | %-8s\n', ...
+        'Filter', 'Pos RMSE', 'Vel RMSE', 'SOG RMSE', 'COG RMSE ', ...
+        'NEES', 'NIS', 'NEES%', 'NIS%');
+fprintf('---------------------------------------------------------------------------------------------------------------------------\n');
 
 for i = 1:num_filters
     filter_name = filter_names{i};
@@ -50,8 +53,76 @@ for i = 1:num_filters
     
     rmse_summary(i, :) = [pos_rmse, vel_rmse, sog_rmse, cog_rmse];
     
-    fprintf('%-15s | %-12.2f | %-12.2f | %-12.2f | %-12.2f\n', ...
-            filter_labels{i}, pos_rmse, vel_rmse, sog_rmse, cog_rmse);
+    % NEES/NIS analysis (if available)
+    if isfield(est, 'nees') && isfield(est, 'nis')
+        % NEES statistics
+        valid_nees = ~isnan(est.nees);
+        if any(valid_nees)
+            nees_mean_val = mean(est.nees(valid_nees));
+            nees_median_val = median(est.nees(valid_nees));
+            nees_std_val = std(est.nees(valid_nees));
+            
+            % NEES consistency (2-DOF position-only system)
+            alpha = 0.05;
+            dof_state = 2;
+            lower_bound = chi2inv(alpha/2, dof_state);
+            upper_bound = chi2inv(1-alpha/2, dof_state);
+            within_bounds = sum(est.nees(valid_nees) >= lower_bound & est.nees(valid_nees) <= upper_bound);
+            nees_consistency = (within_bounds / sum(valid_nees)) * 100;
+            
+            nees_summary(i, :) = [nees_mean_val, nees_median_val, nees_std_val, nees_consistency];
+        else
+            nees_summary(i, :) = [NaN, NaN, NaN, NaN];
+        end
+        
+        % NIS statistics
+        valid_nis = ~isnan(est.nis) & est.nis ~= 0;
+        if any(valid_nis)
+            nis_mean_val = mean(est.nis(valid_nis));
+            nis_median_val = median(est.nis(valid_nis));
+            nis_std_val = std(est.nis(valid_nis));
+            
+            % NIS consistency (2-DOF system)
+            dof_meas = 2;
+            lower_bound_nis = chi2inv(alpha/2, dof_meas);
+            upper_bound_nis = chi2inv(1-alpha/2, dof_meas);
+            within_bounds_nis = sum(est.nis(valid_nis) >= lower_bound_nis & est.nis(valid_nis) <= upper_bound_nis);
+            nis_consistency = (within_bounds_nis / sum(valid_nis)) * 100;
+            
+            nis_summary(i, :) = [nis_mean_val, nis_median_val, nis_std_val, nis_consistency];
+        else
+            nis_summary(i, :) = [NaN, NaN, NaN, NaN];
+        end
+        
+        % Format for display
+        if isnan(nees_summary(i, 1))
+            nees_str = 'N/A';
+            nees_cons_str = 'N/A';
+        else
+            nees_str = sprintf('%.3f', nees_summary(i, 1));
+            nees_cons_str = sprintf('%.1f', nees_summary(i, 4));
+        end
+        
+        if isnan(nis_summary(i, 1))
+            nis_str = 'N/A';
+            nis_cons_str = 'N/A';
+        else
+            nis_str = sprintf('%.3f', nis_summary(i, 1));
+            nis_cons_str = sprintf('%.1f', nis_summary(i, 4));
+        end
+    else
+        % No NEES/NIS data
+        nees_summary(i, :) = [NaN, NaN, NaN, NaN];
+        nis_summary(i, :) = [NaN, NaN, NaN, NaN];
+        nees_str = 'N/A';
+        nis_str = 'N/A';
+        nees_cons_str = 'N/A';
+        nis_cons_str = 'N/A';
+    end
+    
+    fprintf('%-15s | %-12.2f | %-12.2f | %-12.2f | %-12.2f | %-10s | %-10s | %-8s | %-8s\n', ...
+            filter_labels{i}, pos_rmse, vel_rmse, sog_rmse, cog_rmse, ...
+            nees_str, nis_str, nees_cons_str, nis_cons_str);
 end
 
 % Find best performers
@@ -80,6 +151,9 @@ for i = 1:num_filters
     fprintf('%d. %s (score: %.3f)\n', i, filter_labels{idx}, sorted_scores(i));
 end
 
+% Create NEES/NIS comparison visualization
+createNeesNisComparison(filter_estimates, filter_labels);
+
 % Check if we have segment information for detailed analysis
 if isfield(data, 'segment') && length(unique(data.segment)) > 1
     fprintf('\nCreating segment-wise analysis...\n');
@@ -90,8 +164,247 @@ end
 
 fprintf('\nEnhanced visualizations saved to figures/ directory\n');
 fprintf('- Enhanced filter comparison: figures/enhanced_filter_comparison.png\n');
+fprintf('- NEES/NIS comparison: figures/nees_nis_comparison.png\n');
 if isfield(data, 'segment') && length(unique(data.segment)) > 1
     fprintf('- Enhanced segment analysis: figures/enhanced_segment_analysis.png\n');
 end
+
+end
+
+function createNeesNisComparison(filter_estimates, filter_labels)
+% CREATENEESNISCOMPARISON - Create detailed NEES/NIS comparison plots
+
+filter_names = fieldnames(filter_estimates);
+num_filters = length(filter_names);
+
+% Check which filters have NEES/NIS data
+has_nees_nis = false(num_filters, 1);
+for i = 1:num_filters
+    est = filter_estimates.(filter_names{i});
+    has_nees_nis(i) = isfield(est, 'nees') && isfield(est, 'nis');
+end
+
+if ~any(has_nees_nis)
+    fprintf('No NEES/NIS data available for comparison.\n');
+    return;
+end
+
+% Create figure
+figure;
+
+% Define colors for filters
+colors = [
+    0.0000, 0.4470, 0.7410;  % Blue
+    0.8500, 0.3250, 0.0980;  % Orange  
+    0.9290, 0.6940, 0.1250;  % Yellow
+    0.4940, 0.1840, 0.5560;  % Purple
+    0.4660, 0.6740, 0.1880;  % Green
+    0.3010, 0.7450, 0.9330;  % Cyan
+    0.6350, 0.0780, 0.1840;  % Dark Red
+    0.2500, 0.2500, 0.2500;  % Dark Gray
+];
+
+if num_filters > size(colors, 1)
+    additional_colors = hsv(num_filters - size(colors, 1));
+    colors = [colors; additional_colors];
+end
+
+% Get data length from first filter with NEES/NIS data
+first_valid_idx = find(has_nees_nis, 1);
+if ~isempty(first_valid_idx)
+    est = filter_estimates.(filter_names{first_valid_idx});
+    n_samples = length(est.nees);
+    t = 1:n_samples;
+end
+
+% Plot 1: NEES time series
+subplot(2, 2, 1);
+valid_count = 0;
+for i = 1:num_filters
+    if has_nees_nis(i)
+        est = filter_estimates.(filter_names{i});
+        valid_nees = ~isnan(est.nees);
+        if any(valid_nees)
+            plot(t(valid_nees), est.nees(valid_nees), '-', 'Color', colors(i, :), ...
+                 'LineWidth', 1.5, 'DisplayName', filter_labels{i});
+            hold on;
+            valid_count = valid_count + 1;
+        end
+    end
+end
+
+if valid_count > 0
+    % Chi-squared bounds for 2-DOF position-only system
+    alpha = 0.05;
+    dof_state = 2;
+    lower_bound = chi2inv(alpha/2, dof_state);
+    upper_bound = chi2inv(1-alpha/2, dof_state);
+    
+    yline(lower_bound, 'r--', 'Lower Bound (95%)', 'HandleVisibility', 'off');
+    yline(upper_bound, 'r--', 'Upper Bound (95%)', 'HandleVisibility', 'off');
+    yline(dof_state, 'g--', 'Expected Value', 'HandleVisibility', 'off');
+    
+    xlabel('Sample Number');
+    ylabel('NEES');
+    title('Normalized Estimation Error Squared (NEES)');
+    legend('Location', 'best');
+    grid on;
+end
+
+% Plot 2: NIS time series
+subplot(2, 2, 2);
+valid_count = 0;
+for i = 1:num_filters
+    if has_nees_nis(i)
+        est = filter_estimates.(filter_names{i});
+        valid_nis = ~isnan(est.nis) & est.nis ~= 0;
+        if any(valid_nis)
+            plot(t(valid_nis), est.nis(valid_nis), '-', 'Color', colors(i, :), ...
+                 'LineWidth', 1.5, 'DisplayName', filter_labels{i});
+            hold on;
+            valid_count = valid_count + 1;
+        end
+    end
+end
+
+if valid_count > 0
+    % Chi-squared bounds for 2-DOF system
+    dof_meas = 2;
+    lower_bound_nis = chi2inv(alpha/2, dof_meas);
+    upper_bound_nis = chi2inv(1-alpha/2, dof_meas);
+    
+    yline(lower_bound_nis, 'r--', 'Lower Bound (95%)', 'HandleVisibility', 'off');
+    yline(upper_bound_nis, 'r--', 'Upper Bound (95%)', 'HandleVisibility', 'off');
+    yline(dof_meas, 'g--', 'Expected Value', 'HandleVisibility', 'off');
+    
+    xlabel('Sample Number');
+    ylabel('NIS');
+    title('Normalized Innovation Squared (NIS)');
+    legend('Location', 'best');
+    grid on;
+end
+
+% Plot 3: NEES mean comparison
+subplot(2, 2, 3);
+nees_means = [];
+nis_means = [];
+valid_filter_labels = {};
+
+for i = 1:num_filters
+    if has_nees_nis(i)
+        est = filter_estimates.(filter_names{i});
+        valid_nees = ~isnan(est.nees);
+        valid_nis = ~isnan(est.nis) & est.nis ~= 0;
+        
+        if any(valid_nees)
+            nees_means(end+1) = mean(est.nees(valid_nees));
+            if any(valid_nis)
+                nis_means(end+1) = mean(est.nis(valid_nis));
+            else
+                nis_means(end+1) = NaN;
+            end
+            valid_filter_labels{end+1} = filter_labels{i};
+        end
+    end
+end
+
+if ~isempty(nees_means)
+    bar_data = [nees_means', nis_means'];
+    h = bar(bar_data);
+    
+    % Only set FaceColor if we have valid bar handles
+    if ~isempty(h) && length(h) >= 2
+        if isvalid(h(1))
+            h(1).FaceColor = [0.2, 0.4, 0.8];  % Blue for NEES
+        end
+        if isvalid(h(2))
+            h(2).FaceColor = [0.8, 0.4, 0.2];  % Orange for NIS
+        end
+    end
+    
+    % Add expected value lines
+    yline(4, 'g--', 'Expected NEES', 'LineWidth', 2);
+    yline(2, 'm--', 'Expected NIS', 'LineWidth', 2);
+    
+    xlabel('Filter Type');
+    ylabel('Mean Value');
+    title('Mean NEES and NIS Comparison');
+    set(gca, 'XTick', 1:length(valid_filter_labels), ...
+             'XTickLabel', valid_filter_labels, 'XTickLabelRotation', 45);
+    legend({'NEES', 'NIS'}, 'Location', 'best');
+    grid on;
+end
+
+% Plot 4: Consistency comparison
+subplot(2, 2, 4);
+consistency_nees = [];
+consistency_nis = [];
+
+for i = 1:num_filters
+    if has_nees_nis(i)
+        est = filter_estimates.(filter_names{i});
+        
+        % NEES consistency
+        valid_nees = ~isnan(est.nees);
+        if any(valid_nees)
+            lower_bound = chi2inv(alpha/2, dof_state);
+            upper_bound = chi2inv(1-alpha/2, dof_state);
+            within_bounds = sum(est.nees(valid_nees) >= lower_bound & est.nees(valid_nees) <= upper_bound);
+            consistency_nees(end+1) = (within_bounds / sum(valid_nees)) * 100;
+            
+            % NIS consistency
+            valid_nis = ~isnan(est.nis) & est.nis ~= 0;
+            if any(valid_nis)
+                lower_bound_nis = chi2inv(alpha/2, dof_meas);
+                upper_bound_nis = chi2inv(1-alpha/2, dof_meas);
+                within_bounds_nis = sum(est.nis(valid_nis) >= lower_bound_nis & est.nis(valid_nis) <= upper_bound_nis);
+                consistency_nis(end+1) = (within_bounds_nis / sum(valid_nis)) * 100;
+            else
+                consistency_nis(end+1) = NaN;
+            end
+        end
+    end
+end
+
+if ~isempty(consistency_nees)
+    bar_data = [consistency_nees', consistency_nis'];
+    h = bar(bar_data);
+    
+    % Only set FaceColor if we have valid bar handles
+    if ~isempty(h) && length(h) >= 2
+        if isvalid(h(1))
+            h(1).FaceColor = [0.2, 0.4, 0.8];  % Blue for NEES
+        end
+        if isvalid(h(2))
+            h(2).FaceColor = [0.8, 0.4, 0.2];  % Orange for NIS
+        end
+    end
+    
+    % Add 95% target line
+    yline(95, 'r--', '95% Target', 'LineWidth', 2);
+    
+    xlabel('Filter Type');
+    ylabel('Consistency (%)');
+    title('Filter Consistency (% within bounds)');
+    set(gca, 'XTick', 1:length(valid_filter_labels), ...
+             'XTickLabel', valid_filter_labels, 'XTickLabelRotation', 45);
+    legend({'NEES', 'NIS'}, 'Location', 'best');
+    grid on;
+    ylim([0, 100]);
+end
+
+% Add overall title
+sgtitle('NEES and NIS Filter Comparison', 'FontSize', 16, 'FontWeight', 'bold');
+
+% Create output directory if needed
+if ~exist('figures', 'dir')
+    mkdir('figures');
+end
+
+% Save the figure
+saveas(gcf, 'figures/nees_nis_comparison.png');
+savefig('figures/nees_nis_comparison.fig');
+
+fprintf('NEES/NIS comparison plots saved to figures/nees_nis_comparison.png/.fig\n');
 
 end

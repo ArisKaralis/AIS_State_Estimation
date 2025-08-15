@@ -1,5 +1,5 @@
 function randomParams = randomizeSimulationParameters(baseParams)
-% RANDOMIZESIMULATIONPARAMETERS - Creates randomized parameter variations for Monte Carlo
+% RANDOMIZESIMULATIONPARAMETERS - Creates randomided parameter variations for Monte Carlo
 %
 % Takes base parameters and creates realistic variations to simulate different
 % vessels, environmental conditions, and operational scenarios. This ensures

@@ -24,7 +24,7 @@ function saveMonteCarloResults(results, params)
 
 % Create output directory if it doesn't exist
 % All Monte Carlo results are organized in a dedicated output folder
-outputDir = 'output';
+outputDir = 'data';
 if ~exist(outputDir, 'dir')
     mkdir(outputDir);
 end
@@ -32,8 +32,7 @@ end
 % Create timestamped filename to prevent overwrites
 % Format: monte_carlo_results_YYYYMMDD_HHMMSS.mat
 % This ensures each simulation run creates a unique file
-timestamp = datestr(now, 'yyyymmdd_HHMMSS');
-filename = sprintf('monte_carlo_results_%s.mat', timestamp);
+filename = sprintf('monte_carlo_results.mat');
 filepath = fullfile(outputDir, filename);
 
 % Save results with metadata using MATLAB v7.3 format

@@ -1,8 +1,8 @@
 function [estimates, stats] = runIMMFilterEKF(data, q_cv, q_ca, q_ctrv, pos_std, vel_std, acc_std)
     % RUNIMMFILTEREKF - IMM filter using existing modular EKF implementations
-    % Uses ekfCV.m, ekfCA.m, and ekfCTRV.m directly
+    % Uses ekfCV.m, ekfCA.m, and ekfCTRV.m directly with NEES/NIS evaluation
     
-    fprintf('Starting IMM-EKF with process noise intensities: CV=%.3f, CA=%.3f, CTRV=%.3f\n', q_cv, q_ca, q_ctrv);
+    % fprintf('Starting IMM-EKF with process noise intensities: CV=%.3f, CA=%.3f, CTRV=%.3f\n', q_cv, q_ca, q_ctrv);
     
     n = height(data);
     num_models = 3;
@@ -13,12 +13,11 @@ function [estimates, stats] = runIMMFilterEKF(data, q_cv, q_ca, q_ctrv, pos_std,
                         0.025, 0.95, 0.025;    % CA -> [CV, CA, CTRV]
                         0.025, 0.025, 0.95];   % CTRV -> [CV, CA, CTRV]
     
-  
-    % Run each filter separately using existing functions
-    fprintf('Running individual EKF models...\n');
-    [x_est_cv, P_est_cv] = ekfCV(data, q_cv, pos_std, vel_std);
-    [x_est_ca, P_est_ca] = ekfCA(data, q_ca, pos_std, vel_std, acc_std);
-    [x_est_ctrv, P_est_ctrv] = ekfCTRV(data, q_ctrv, pos_std, vel_std);
+    % Run each filter separately using existing functions with innovation tracking
+    % fprintf('Running individual EKF models with innovation tracking...\n');
+    [x_est_cv, P_est_cv, innovations_cv, S_innovations_cv] = ekfCV(data, q_cv, pos_std, vel_std);
+    [x_est_ca, P_est_ca, innovations_ca, S_innovations_ca] = ekfCA(data, q_ca, pos_std, vel_std, acc_std);
+    [x_est_ctrv, P_est_ctrv, innovations_ctrv, S_innovations_ctrv] = ekfCTRV(data, q_ctrv, pos_std, vel_std);
     
     % Initialize storage for IMM results
     estimates = struct();
@@ -34,6 +33,13 @@ function [estimates, stats] = runIMMFilterEKF(data, q_cv, q_ca, q_ctrv, pos_std,
     model_probs_history = zeros(num_models, n);
     model_probs_history(:, 1) = model_probs';
     
+    % Initialize NEES and NIS storage for IMM
+    estimates.nees = zeros(n, 1);
+    estimates.nis = zeros(n, 1);
+    estimates.combined_P = zeros(4, 4, n);  % Combined covariance for NEES
+    estimates.combined_innovations = zeros(2, n);  % Combined innovations for NIS
+    estimates.combined_S = zeros(2, 2, n);  % Combined innovation covariances for NIS
+    
     % Initialize first estimate
     estimates.x_est(1) = data.x(1);
     estimates.y_est(1) = data.y(1);
@@ -41,6 +47,15 @@ function [estimates, stats] = runIMMFilterEKF(data, q_cv, q_ca, q_ctrv, pos_std,
     estimates.vy_est(1) = x_est_cv(4, 1);
     estimates.sog_est(1) = sqrt(estimates.vx_est(1)^2 + estimates.vy_est(1)^2);
     estimates.cog_est(1) = mod(rad2deg(atan2(estimates.vy_est(1), estimates.vx_est(1))), 360);
+    
+    % First timestep NEES/NIS (use CV model as reference)
+    P_cv_init = P_est_cv(:,:,1);
+    true_state_init = [data.x_true(1); x_est_cv(2,1); data.y_true(1); x_est_cv(4,1)];
+    est_state_init = [estimates.x_est(1); estimates.vx_est(1); estimates.y_est(1); estimates.vy_est(1)];
+    error_init = est_state_init - true_state_init;
+    estimates.nees(1) = error_init' * (P_cv_init \ error_init);
+    estimates.nis(1) = NaN;  % No innovation for first timestep
+    estimates.combined_P(:,:,1) = P_cv_init;
     
     % IMM combination for each time step
     for k = 2:n
@@ -117,16 +132,59 @@ function [estimates, stats] = runIMMFilterEKF(data, q_cv, q_ca, q_ctrv, pos_std,
                         model_probs(2) * state_ca + ...
                         model_probs(3) * state_ctrv;
         
+        % Combine covariances using model probabilities (for NEES calculation)
+        combined_P = model_probs(1) * P_cv + ...
+                    model_probs(2) * P_ca + ...
+                    model_probs(3) * P_ctrv;
+        
+        % Add interaction uncertainty (simplified)
+        for i = 1:3
+            state_i = [state_cv, state_ca, state_ctrv];
+            diff_i = state_i(:,i) - combined_state;
+            combined_P = combined_P + model_probs(i) * (diff_i * diff_i');
+        end
+        estimates.combined_P(:,:,k) = combined_P;
+        
+        % Combine innovations using model probabilities (for NIS calculation)
+        combined_innovation = model_probs(1) * innovation_cv + ...
+                             model_probs(2) * innovation_ca + ...
+                             model_probs(3) * innovation_ctrv;
+        
+        % Combine innovation covariances
+        combined_S = model_probs(1) * S_cv + ...
+                    model_probs(2) * S_ca + ...
+                    model_probs(3) * S_ctrv;
+        
+        estimates.combined_innovations(:,k) = combined_innovation;
+        estimates.combined_S(:,:,k) = combined_S;
+        
         % Store combined estimates
         estimates.x_est(k) = combined_state(1);
         estimates.vx_est(k) = combined_state(2);
         estimates.y_est(k) = combined_state(3);
         estimates.vy_est(k) = combined_state(4);
         
-        % FIXED SOG and COG calculation
+        % Calculate SOG and COG
         estimates.sog_est(k) = sqrt(combined_state(2)^2 + combined_state(4)^2);
-        cog_rad = atan2(combined_state(4), combined_state(2));  % FIXED: atan2(vy, vx)
+        cog_rad = atan2(combined_state(4), combined_state(2));
         estimates.cog_est(k) = mod(rad2deg(cog_rad), 360);
+        
+        % Calculate NEES for this timestep
+        true_state = [data.x_true(k); data.vx_true(k); data.y_true(k); data.vy_true(k)];
+        error = combined_state - true_state;
+        
+        try
+            estimates.nees(k) = error' * (combined_P \ error);
+        catch
+            estimates.nees(k) = NaN;
+        end
+        
+        % Calculate NIS for this timestep
+        try
+            estimates.nis(k) = combined_innovation' * (combined_S \ combined_innovation);
+        catch
+            estimates.nis(k) = NaN;
+        end
     end
     
     % Store model probabilities for analysis
@@ -134,8 +192,8 @@ function [estimates, stats] = runIMMFilterEKF(data, q_cv, q_ca, q_ctrv, pos_std,
     estimates.model_probs_ca = model_probs_history(2, :)';
     estimates.model_probs_ctrv = model_probs_history(3, :)';
     
-    % Calculate statistics
-    stats = calculateFilterStats(estimates, data, 'IMM-EKF');
+    % Calculate statistics with NEES/NIS
+    stats = calculateFilterStats(estimates, data, 'IMM-EKF-3');
     
     % Additional error calculation
     pos_errors = sqrt((estimates.x_est - data.x_true).^2 + (estimates.y_est - data.y_true).^2);
@@ -149,8 +207,9 @@ function [estimates, stats] = runIMMFilterEKF(data, q_cv, q_ca, q_ctrv, pos_std,
     stats.sog_rmse = sqrt(mean(sog_errors.^2));
     stats.cog_rmse = sqrt(mean(cog_errors.^2));
     
+
     % Generate plots using the dedicated plotting function
-    % plotIMMResults(data, estimates, 'IMM-3', {'CV', 'CA', 'CTRV'});
+    % plotIMMResults(data, estimates, stats, 'IMM-3', {'CV', 'CA', 'CTRV'});
 end
 
 function likelihood = calculateGaussianLikelihood(innovation, S)

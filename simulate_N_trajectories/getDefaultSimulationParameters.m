@@ -27,7 +27,7 @@ params.processNoise.turnRate = deg2rad(0.5); % Turn rate noise std (rad/s) - ste
 % Based on IMO performance standards and real AIS system accuracy
 params.measurementNoise = struct();
 params.measurementNoise.position = 20.0;        % Position error std (meters) - GPS accuracy
-params.measurementNoise.velocity = 1.0;         % Speed error std (m/s) - Doppler/GPS velocity error
+params.measurementNoise.velocity = 0.5;         % Speed error std (m/s) - Doppler/GPS velocity error
 params.measurementNoise.course = deg2rad(5.0);  % Heading error std (radians) - compass/GPS heading error
 
 % VESSEL DYNAMICS - Physical limits and capabilities

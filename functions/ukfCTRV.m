@@ -1,4 +1,4 @@
-function [x_est, P_est] = ukfCTRV(data, q, pos_std, vel_std)
+function [x_est, P_est, innovations, S_innovations] = ukfCTRV(data, q, pos_std, vel_std)
     % UNSCENTEDKALMANFILTERCTRV - Improved UKF implementation for CTRV model
     
     n = height(data);
@@ -52,7 +52,7 @@ function [x_est, P_est] = ukfCTRV(data, q, pos_std, vel_std)
     ukf.Kappa = 2;      % n-3=2 for 5D state space (recommended for CTRV)
     
     % More appropriate initial covariance for CTRV
-    ukf.StateCovariance = diag([pos_std^2/9, pos_std^2/9, vel_std^2/4, deg2rad(10)^2, deg2rad(1)^2]);
+    ukf.StateCovariance = diag([pos_std^2, pos_std^2, vel_std^2 * 4, deg2rad(5)^2, deg2rad(0.5)^2]);
     
     R_pos = diag([pos_std^2, pos_std^2]);
     
@@ -60,8 +60,19 @@ function [x_est, P_est] = ukfCTRV(data, q, pos_std, vel_std)
     x_est = zeros(5, n);
     P_est = zeros(5, 5, n);
     
+    % Initialize innovation tracking (optional outputs)
+    if nargout >= 3
+        innovations = zeros(2, n);        % For position measurements [x; y]
+        S_innovations = zeros(2, 2, n);   % Innovation covariance matrices
+    end
+    
     x_est(:,1) = ukf.State;
     P_est(:,:,1) = ukf.StateCovariance;
+    
+    if nargout >= 3
+        innovations(:,1) = NaN;  % No innovation for initial state
+        S_innovations(:,:,1) = NaN;
+    end
     
     % Main filtering loop
     for k = 2:n
@@ -71,8 +82,8 @@ function [x_est, P_est] = ukfCTRV(data, q, pos_std, vel_std)
         end
         
         % Improved process noise model for CTRV
-        Q = q * diag([dt_k^4/4, dt_k^4/4, dt_k^2, deg2rad(0.5)^2*dt_k, deg2rad(0.1)^2*dt_k]);
-        
+        Q = q * diag([dt_k^4/4, dt_k^4/4, dt_k^2, deg2rad(0.3)^2*dt_k, deg2rad(0.05)^2*dt_k]);
+
         ukf.ProcessNoise = Q;
         
         predict(ukf, dt_k);
@@ -83,10 +94,27 @@ function [x_est, P_est] = ukfCTRV(data, q, pos_std, vel_std)
         if ~isnan(data.x(k)) && ~isnan(data.y(k))
             z = [data.x(k); data.y(k)];
             ukf.MeasurementNoise = R_pos;
+            
+            % Calculate innovation for NIS (before correction)
+            if nargout >= 3
+                H = [1, 0, 0, 0, 0; 0, 1, 0, 0, 0];  % Measurement matrix for position
+                z_pred = positionMeasurementFcn(ukf.State);
+                innovation = z - z_pred;
+                S = H * ukf.StateCovariance * H' + R_pos;
+                
+                innovations(:,k) = innovation;
+                S_innovations(:,:,k) = S;
+            end
+            
             correct(ukf, z);
             
             % Normalize yaw angle after correction
             ukf.State(4) = mod(ukf.State(4) + pi, 2*pi) - pi;
+        else
+            if nargout >= 3
+                innovations(:,k) = NaN;
+                S_innovations(:,:,k) = NaN;
+            end
         end
         
         x_est(:,k) = ukf.State;

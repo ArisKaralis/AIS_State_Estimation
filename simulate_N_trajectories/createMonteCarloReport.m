@@ -34,7 +34,7 @@ subplot(2, 3, 6);
 plotErrorVsParameters(results);
 
 % Add overall title with run count
-sgtitle(sprintf('Monte Carlo Analysis (%d runs)', results.summary.numRuns));
+sgtitle(sprintf('Simulated Ground-Truth/Measurement Analysis (%d runs)', results.summary.numRuns));
 
 % Save report
 [filepath, name, ~] = fileparts(saveDir);

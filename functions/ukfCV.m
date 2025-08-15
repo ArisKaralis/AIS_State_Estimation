@@ -1,4 +1,4 @@
-function [x_est, P_est] = ukfCV(data, q, pos_std, vel_std)
+function [x_est, P_est, innovations, S_innovations] = ukfCV(data, q, pos_std, vel_std)
     % UNSCENTEDKALMANFILTERCV - Improved UKF implementation for CV model
     
     n = height(data);
@@ -22,17 +22,28 @@ function [x_est, P_est] = ukfCV(data, q, pos_std, vel_std)
     ukf.Kappa = 1;      % Changed from 0 to ensure positive definiteness
     
     % More conservative initial covariance
-    ukf.StateCovariance = diag([pos_std^2/9, vel_std^2/4, pos_std^2/9, vel_std^2/4]);
+    ukf.StateCovariance = diag([pos_std^2, vel_std^2, pos_std^2, vel_std^2]);
     
     % Measurement noise
-    R_pos = diag([pos_std^2, pos_std^2]);
+    R_pos = diag([pos_std^2 , pos_std^2]);
     
     % Initialize output
     x_est = zeros(4, n);
     P_est = zeros(4, 4, n);
     
+    % Initialize innovation tracking (optional outputs)
+    if nargout >= 3
+        innovations = zeros(2, n);        % For position measurements [x; y]
+        S_innovations = zeros(2, 2, n);   % Innovation covariance matrices
+    end
+    
     x_est(:,1) = ukf.State;
     P_est(:,:,1) = ukf.StateCovariance;
+    
+    if nargout >= 3
+        innovations(:,1) = NaN;  % No innovation for initial state
+        S_innovations(:,:,1) = NaN;
+    end
     
     % Main filtering loop
     for k = 2:n
@@ -51,7 +62,24 @@ function [x_est, P_est] = ukfCV(data, q, pos_std, vel_std)
         if ~isnan(data.x(k)) && ~isnan(data.y(k))
             z = [data.x(k); data.y(k)];
             ukf.MeasurementNoise = R_pos;
+            
+            % Calculate innovation for NIS (before correction)
+            if nargout >= 3
+                H = [1, 0, 0, 0; 0, 0, 1, 0];  % Measurement matrix for position
+                z_pred = positionMeasurementFcn(ukf.State);
+                innovation = z - z_pred;
+                S = H * ukf.StateCovariance * H' + R_pos;
+                
+                innovations(:,k) = innovation;
+                S_innovations(:,:,k) = S;
+            end
+            
             correct(ukf, z);
+        else
+            if nargout >= 3
+                innovations(:,k) = NaN;
+                S_innovations(:,:,k) = NaN;
+            end
         end
         
         x_est(:,k) = ukf.State;

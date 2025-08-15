@@ -1,4 +1,4 @@
-function [x_est, P_est] = kfCV(data, q, pos_std, vel_std)
+function [x_est, P_est, innovations, S_innovations] = kfCV(data, q, pos_std, vel_std)
     % KALMANFILTERCV - Core Kalman filter implementation for CV model
     % Returns state estimates and covariances for reuse in other filters
     
@@ -18,11 +18,17 @@ function [x_est, P_est] = kfCV(data, q, pos_std, vel_std)
                    'MeasurementModel', [1 0 0 0; 0 0 1 0], ...
                    'State', [data.x(1); initial_vx; data.y(1); initial_vy], ...
                    'StateCovariance', diag([pos_std^2/4, vel_std^2, pos_std^2/4, vel_std^2]), ...
-                   'MeasurementNoise', diag([pos_std^2, pos_std^2]));
+                   'MeasurementNoise', diag([pos_std^2 * 0.3, pos_std^2 * 0.3]));
     
     % Initialize output
     x_est = zeros(4, n);
     P_est = zeros(4, 4, n);
+    
+    % Initialize innovation tracking (optional outputs)
+    if nargout >= 3
+        innovations = zeros(2, n);        % For position measurements [x; y]
+        S_innovations = zeros(2, 2, n);   % Innovation covariance matrices
+    end
     
     % First measurement update
     if ~isnan(data.x(1)) && ~isnan(data.y(1))
@@ -31,6 +37,11 @@ function [x_est, P_est] = kfCV(data, q, pos_std, vel_std)
     else
         x_est(:,1) = kf.State;
         P_est(:,:,1) = kf.StateCovariance;
+    end
+    
+    if nargout >= 3
+        innovations(:,1) = NaN;  % No innovation for initial state
+        S_innovations(:,:,1) = NaN;
     end
     
     % Main filtering loop
@@ -60,10 +71,27 @@ function [x_est, P_est] = kfCV(data, q, pos_std, vel_std)
         % Measurement update
         if ~isnan(data.x(k)) && ~isnan(data.y(k))
             z = [data.x(k); data.y(k)];
+            
+            % Calculate innovation for NIS (before correction)
+            if nargout >= 3
+                H = [1 0 0 0; 0 0 1 0];  % Measurement matrix for position
+                z_pred = H * kf.State;
+                innovation = z - z_pred;
+                S = H * kf.StateCovariance * H' + kf.MeasurementNoise;
+                
+                innovations(:,k) = innovation;
+                S_innovations(:,:,k) = S;
+            end
+            
             [x_est(:,k), P_est(:,:,k)] = correct(kf, z);
         else
             x_est(:,k) = kf.State;
             P_est(:,:,k) = kf.StateCovariance;
+            
+            if nargout >= 3
+                innovations(:,k) = NaN;
+                S_innovations(:,:,k) = NaN;
+            end
         end
     end
 end

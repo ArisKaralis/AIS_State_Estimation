@@ -30,7 +30,7 @@ else
     fprintf('Running Monte Carlo simulation with %d runs (Random seed: %d)...\n', numRuns, seedValue);
 end
 
-% Initialize results structure
+% Initialise results structure
 results = struct();
 results.runs = cell(numRuns, 1);
 results.summary = struct();
@@ -40,7 +40,7 @@ results.metadata.timestamp = datetime('now');
 
 % Execute Monte Carlo runs
 for run = 1:numRuns
-    fprintf('Run %d/%d\n', run, numRuns);
+    % fprintf('Run %d/%d\n', run, numRuns);
     
     % Randomize parameters for this run
     runParams = randomizeSimulationParameters(simParams);

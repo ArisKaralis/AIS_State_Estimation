@@ -24,7 +24,7 @@ function summary = calculateMonteCarloStatistics(results)
 numRuns = length(results.runs);
 
 % DEBUG OUTPUT - Track processing progress
-fprintf('=== CALCULATE STATISTICS DEBUG ===\n');
+fprintf('=== CALCULATE DATA STATISTICS  ===\n');
 fprintf('Processing %d Monte Carlo runs...\n', numRuns);
 
 % Initialize error collection arrays
@@ -49,7 +49,7 @@ for run = 1:numRuns
         validObs = obs.available;          % Boolean array of successful AIS transmissions
         numValidObs = sum(validObs);       % Count of successful observations
         
-        fprintf('Run %d: %d valid observations out of %d total\n', run, numValidObs, length(validObs));
+        % fprintf('Run %d: %d valid observations out of %d total\n', run, numValidObs, length(validObs));
         
         if numValidObs == 0
             fprintf('Run %d: Skipping - no valid observations\n', run);
@@ -75,7 +75,7 @@ for run = 1:numRuns
         finalValidIndices = validIndices(validGtMask);  % Final valid observation indices
         finalGtIndices = gtIndices(validGtMask);        % Final valid ground truth indices
         
-        fprintf('Run %d: Processing %d valid observation pairs\n', run, length(finalValidIndices));
+        % fprintf('Run %d: Processing %d valid observation pairs\n', run, length(finalValidIndices));
         
         % ERROR CALCULATION LOOP - Compute errors for each valid observation
         runPosErrors = 0;  % Counter for this run
@@ -105,7 +105,7 @@ for run = 1:numRuns
             runPosErrors = runPosErrors + 1;
         end
         
-        fprintf('Run %d: Added %d position errors\n', run, runPosErrors);
+        % fprintf('Run %d: Added %d position errors\n', run, runPosErrors);
         
     catch ME
         fprintf('Run %d: Error - %s\n', run, ME.message);
@@ -160,7 +160,6 @@ summary.numRuns = numRuns;                    % Total Monte Carlo runs processed
 summary.totalObservations = length(posErrors); % Total valid observations across all runs
 
 fprintf('Final summary: %d total observations processed\n', summary.totalObservations);
-fprintf('=== END CALCULATE STATISTICS DEBUG ===\n');
 
 % INTERPRETATION NOTES:
 % - Lower RMSE values indicate better sensor/measurement accuracy

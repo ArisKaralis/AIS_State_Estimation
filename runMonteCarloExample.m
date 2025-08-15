@@ -16,7 +16,7 @@
 %   - Sample AIS dataset exported as CSV
 %   - Visual analysis report generated automatically
 clear all;
-addpath('simulateTrajectory');
+addpath('simulate_N_trajectories');
 
 % STEP 1: GET DEFAULT PARAMETERS
 % Load standard simulation parameters based on real-world AIS systems
@@ -26,12 +26,13 @@ params = getDefaultSimulationParameters();
 % Configure for specific testing scenario
 
 % Temporal settings - 1-hour simulation with 10-second AIS reports
-params.totalDuration = 3600;        % Total simulation time (seconds) - 1 hour
+params.totalDuration = 3600;        % Total simulation time (seconds) - 100 hour
 params.aisReportInterval = 10;      % AIS reporting frequency (seconds) - every 10s
 
 % Measurement noise levels - Simulate high-quality AIS equipment
 params.measurementNoise.position = 6;   % GPS position error std (meters) - good accuracy
 params.measurementNoise.velocity = 1.0; % Speed measurement error std (m/s) - typical AIS
+params.measurementNoise.course = deg2rad(5.0);  % Heading error (radians)
 
 % Motion behavior - Moderate maneuvering frequency
 params.modeTransition.probability = 0.03; % 3% chance per second of changing motion mode
@@ -42,7 +43,7 @@ fprintf('Starting Monte Carlo simulation...\n');
 results = runMonteCarloSimulation(100, params, 'Seed', 42);
 
 % STEP 4: DISPLAY RESULTS SUMMARY
-% Print comprehensive statistics across all simulation runs
+% Print statistics across all simulation runs
 fprintf('\n===== Monte Carlo Simulation Results =====\n');
 fprintf('Configuration:\n');
 fprintf('  Number of runs: %d\n', results.summary.numRuns);
